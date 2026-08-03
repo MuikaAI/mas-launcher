@@ -109,10 +109,13 @@ func napcatWindows(instancePath string) error {
 	fmt.Printf("Starting NapCat (WebUI: http://127.0.0.1:6099/webui)...\n")
 	var c *exec.Cmd
 	if qq != "" {
-		c = exec.Command("cmd", "/c", "start", `"NapCat"`, "/D", dir, bat, qq)
+		c = exec.Command("cmd", "/c", "start", "", bat, qq)
 	} else {
-		c = exec.Command("cmd", "/c", "start", `"NapCat"`, "/D", dir, bat)
+		c = exec.Command("cmd", "/c", "start", "", bat)
 	}
+	// Set the CWD so the new terminal inherits the NapCat directory,
+	// avoiding fragile quoting with start /D.
+	c.Dir = dir
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("failed to start NapCat: %w", err)
 	}
