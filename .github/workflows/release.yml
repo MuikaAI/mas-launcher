@@ -1,0 +1,56 @@
+name: Build mas-launcher
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - run: go test ./...
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -ldflags "-s -w" -o mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+      - name: Checksum
+        run: sha256sum mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} > mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+            mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.sha256
