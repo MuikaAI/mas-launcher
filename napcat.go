@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,20 +16,36 @@ import (
 	"time"
 )
 
-// napcatCmd implements `mas-launcher napcat [name]`.
+// napcatCmd implements `mas-launcher napcat [name] [--show-napcat]`.
 func (m *Manager) napcatCmd(args []string) error {
-	name, _ := instanceName(args)
+	name, rest := instanceName(args)
+	fs := flag.NewFlagSet("napcat", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	showWindow := fs.Bool("show-napcat", false, "show NapCat terminal window")
+	if err := fs.Parse(rest); err != nil {
+		return err
+	}
 	i, repo, err := m.instance(name)
 	if err != nil {
 		return err
 	}
-	// Print Onebot V11 connection info regardless of platform
 	napcatConfigInfo(repo, i)
 	fmt.Println()
 
 	switch runtime.GOOS {
 	case "windows":
-		return napcatWindows(i.Path)
+		dir, qq, err := napcatWindows(i.Path, i.NapCatDir, i.NapCatQQ, *showWindow)
+		if err != nil {
+			return err
+		}
+		if dir != "" {
+			inst := m.Config.Instances[name]
+			inst.NapCatDir = dir
+			inst.NapCatQQ = qq
+			m.Config.Instances[name] = inst
+			_ = m.save()
+		}
+		return nil
 	case "linux":
 		return napcatLinux()
 	case "darwin":
@@ -57,13 +74,17 @@ func napcatConfigInfo(repo string, i Instance) {
 	fmt.Println("─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─")
 }
 
-// napcatWindows guides the user through NapCat.Shell download, extraction
-// and launch on Windows.
-func napcatWindows(instancePath string) error {
+// napcatWindows guides the user through NapCat.Shell setup, remembers the
+// directory and QQ number across runs, auto-configures the Onebot v11
+// reverse-WebSocket client, and launches NapCat minimized.
+func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow bool) (dir, qq string, _ error) {
+	if defaultDir == "" {
+		defaultDir = filepath.Join(instancePath, "napcat")
+	}
 	p := newPrompt()
-	dir, err := p.ask("NapCat directory", filepath.Join(instancePath, "napcat"))
+	dir, err := p.ask("NapCat directory", defaultDir)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	dir = strings.TrimSpace(dir)
 
@@ -77,7 +98,7 @@ func napcatWindows(instancePath string) error {
 	if needDownload {
 		dl, err := p.askBool("Download NapCat.Shell.zip to this directory", true)
 		if err != nil {
-			return err
+			return "", "", err
 		}
 		if dl {
 			if err := downloadNapCat(dir); err != nil {
@@ -90,38 +111,123 @@ func napcatWindows(instancePath string) error {
 		}
 	}
 
-	qq, err := p.ask("QQ number (optional, or leave empty to scan QR in WebUI)", "")
+	qq, err = p.ask("QQ number (optional, or leave empty to scan QR in WebUI)", defaultQQ)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	qq = strings.TrimSpace(qq)
 
+	// Pick the right launcher script
 	bat := filepath.Join(dir, "launcher.bat")
 	if _, err := os.Stat(bat); err != nil {
 		bat = filepath.Join(dir, "launcher-win10.bat")
 		if _, err := os.Stat(bat); err != nil {
 			fmt.Println("launcher.bat not found in", dir)
 			fmt.Println("Make sure NapCat.Shell is extracted and try again.")
-			return nil
+			return dir, qq, nil
 		}
 	}
 
-	fmt.Printf("Starting NapCat (WebUI: http://127.0.0.1:6099/webui)...\n")
-	var c *exec.Cmd
+	// Auto-configure Onebot v11 reverse WebSocket client so NapCat
+	// connects back to the bot without manual configuration.
 	if qq != "" {
-		c = exec.Command("cmd", "/c", "start", "", bat, qq)
-	} else {
-		c = exec.Command("cmd", "/c", "start", "", bat)
+		if err := configureOnebot(dir, qq); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not auto-configure Onebot: %v\n", err)
+		}
 	}
-	// Set the CWD so the new terminal inherits the NapCat directory,
-	// avoiding fragile quoting with start /D.
+
+	// Build the start command. Use /MIN to hide the terminal window unless
+	// the user explicitly asked to see it (--show-napcat).
+	startArgs := []string{"/c", "start", ""}
+	if !showWindow {
+		startArgs = append(startArgs, "/MIN")
+	}
+	startArgs = append(startArgs, bat)
+	if qq != "" {
+		startArgs = append(startArgs, qq)
+	}
+	c := exec.Command("cmd", startArgs...)
 	c.Dir = dir
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("failed to start NapCat: %w", err)
+		return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
 	}
-	fmt.Println("NapCat launched in a new terminal window.")
-	fmt.Println("Open http://127.0.0.1:6099/webui to scan QR and log in.")
-	return nil
+
+	// Wait briefly for NapCat to initialise, then print the WebUI address
+	// with the token from webui.json.
+	time.Sleep(2 * time.Second)
+	if tokenURL := readWebUIToken(dir); tokenURL != "" {
+		fmt.Println("NapCat WebUI:", tokenURL)
+	} else {
+		fmt.Println("NapCat WebUI: http://127.0.0.1:6099/webui (token will appear after first launch)")
+	}
+	fmt.Println("Open the WebUI to scan QR and log in.")
+	return dir, qq, nil
+}
+
+// configureOnebot writes (or updates) onebot11_<qq>.json in napcat/config
+// with a reverse-WebSocket client that points to the bot's Onebot V11
+// listen address.
+func configureOnebot(dir, qq string) error {
+	configDir := filepath.Join(dir, "config")
+	path := filepath.Join(configDir, "onebot11_"+qq+".json")
+
+	// Read existing config if present; otherwise start fresh.
+	cfg := make(map[string]any)
+	if b, err := os.ReadFile(path); err == nil {
+		json.Unmarshal(b, &cfg)
+	}
+
+	// Build the websocketClients entry pointing at the bot.
+	wsClient := map[string]any{
+		"enable":            true,
+		"name":              "Muika-After-Story",
+		"url":               "ws://127.0.0.1:8080/onebot/v11/",
+		"reportSelfMessage": false,
+		"messagePostFormat": "array",
+		"token":             "",
+		"debug":             false,
+		"heartInterval":     30000,
+		"reconnectInterval": 30000,
+		"verifyCertificate": true,
+	}
+
+	network, _ := cfg["network"].(map[string]any)
+	if network == nil {
+		network = make(map[string]any)
+		cfg["network"] = network
+	}
+	network["websocketClients"] = []any{wsClient}
+
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o600)
+}
+
+// readWebUIToken reads webui.json in the NapCat config directory
+// and returns a ready-to-use WebUI URL like
+// "http://127.0.0.1:6099/webui?token=abc123".
+func readWebUIToken(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, "config", "webui.json"))
+	if err != nil {
+		return ""
+	}
+	var cfg struct {
+		Port  int    `json:"port"`
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(b, &cfg); err != nil || cfg.Token == "" {
+		return ""
+	}
+	port := cfg.Port
+	if port == 0 {
+		port = 6099
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d/webui?token=%s", port, cfg.Token)
 }
 
 // napcatLinux prints the one-click installer command for Linux.

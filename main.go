@@ -40,6 +40,8 @@ type Instance struct {
 	Port      int    `json:"core_port"`
 	Bot       bool   `json:"bot"`
 	CreatedAt string `json:"created_at"`
+	NapCatDir string `json:"napcat_dir,omitempty"`
+	NapCatQQ  string `json:"napcat_qq,omitempty"`
 }
 type State struct {
 	SchemaVersion int       `json:"schema_version"`
@@ -116,7 +118,7 @@ func usage() {
   mas-launcher configure [name]                    configure .env and model
   mas-launcher model [name]                        configure models.yml (wizard or CRUD)
   mas-launcher license [name] [--status]           view/sign the license agreement
-  mas-launcher napcat [name]                        configure QQ access (NapCat)
+  mas-launcher napcat [name] [--show-napcat]        configure QQ access (NapCat)
   mas-launcher start [name] [--foreground]         start Core and Bot
   mas-launcher stop|restart [name]                 manage processes
   mas-launcher status [name] [--json]              inspect state
