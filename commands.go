@@ -217,6 +217,7 @@ func (m *Manager) startCmd(args []string) error {
 	if e = m.writeState(name, state); e != nil {
 		return e
 	}
+	napcatConfigInfo(repo, i)
 	if !*foreground {
 		fmt.Printf("Instance %s is running in background.\n", name)
 		return nil

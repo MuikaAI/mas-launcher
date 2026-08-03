@@ -83,6 +83,8 @@ func run(args []string) error {
 		return m.modelCmd(args[1:])
 	case "license":
 		return m.licenseCmd(args[1:])
+	case "napcat":
+		return m.napcatCmd(args[1:])
 	case "start":
 		return m.startCmd(args[1:])
 	case "stop":
@@ -114,6 +116,7 @@ func usage() {
   mas-launcher configure [name]                    configure .env and model
   mas-launcher model [name]                        configure models.yml (wizard or CRUD)
   mas-launcher license [name] [--status]           view/sign the license agreement
+  mas-launcher napcat [name]                        configure QQ access (NapCat)
   mas-launcher start [name] [--foreground]         start Core and Bot
   mas-launcher stop|restart [name]                 manage processes
   mas-launcher status [name] [--json]              inspect state
