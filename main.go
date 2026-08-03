@@ -118,7 +118,7 @@ func usage() {
   mas-launcher configure [name]                    configure .env and model
   mas-launcher model [name]                        configure models.yml (wizard or CRUD)
   mas-launcher license [name] [--status]           view/sign the license agreement
-  mas-launcher napcat [name] [--show-napcat] [--admin] configure QQ access (NapCat)
+  mas-launcher napcat [name] [--show-napcat] [--admin] [--stop] configure QQ access (NapCat)
   mas-launcher start [name] [--foreground]         start Core and Bot
   mas-launcher stop|restart [name]                 manage processes
   mas-launcher status [name] [--json]              inspect state

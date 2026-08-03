@@ -231,6 +231,10 @@ func (m *Manager) stopCmd(args []string) error {
 	if e != nil {
 		return errNotRunning
 	}
+	// Best-effort: also stop NapCat if configured.
+	if i, ok := m.Config.Instances[name]; ok && i.NapCatDir != "" {
+		_ = stopNapCat(i.NapCatDir)
+	}
 	return m.stopState(name, s)
 }
 func (m *Manager) stopState(name string, s State) error {

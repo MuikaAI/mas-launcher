@@ -16,13 +16,14 @@ import (
 	"time"
 )
 
-// napcatCmd implements `mas-launcher napcat [name] [--show-napcat] [--admin]`.
+// napcatCmd implements `mas-launcher napcat [name] [--show-napcat] [--admin] [--stop]`.
 func (m *Manager) napcatCmd(args []string) error {
 	name, rest := instanceName(args)
 	fs := flag.NewFlagSet("napcat", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showWindow := fs.Bool("show-napcat", false, "show NapCat terminal window")
 	admin := fs.Bool("admin", false, "run with administrator privileges (UAC, window visible)")
+	stop := fs.Bool("stop", false, "stop the running NapCat process")
 	if err := fs.Parse(rest); err != nil {
 		return err
 	}
@@ -30,11 +31,20 @@ func (m *Manager) napcatCmd(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	if *stop {
+		return stopNapCat(i.NapCatDir)
+	}
+
 	napcatConfigInfo(repo, i)
 	fmt.Println()
 
 	switch runtime.GOOS {
 	case "windows":
+		// Kill any previously-running NapCat before launching a new one.
+		if i.NapCatDir != "" {
+			_ = stopNapCat(i.NapCatDir)
+		}
 		dir, qq, err := napcatWindows(i.Path, i.NapCatDir, i.NapCatQQ, *showWindow, *admin)
 		if err != nil {
 			return err
@@ -262,6 +272,61 @@ func napcatMacOS() error {
 	fmt.Println("Refer to https://napneko.pages.dev or use Docker:")
 	fmt.Println("  deploy/README.md")
 	return nil
+}
+
+// stopNapCat finds and kills the NapCat process whose executable is under
+// the given napcat directory. Returns nil if no such process exists.
+func stopNapCat(dir string) error {
+	if dir == "" {
+		return errors.New("no napcat directory configured; run mas-launcher napcat first")
+	}
+	pid, err := findNapCatPID(dir)
+	if err != nil {
+		return err
+	}
+	if err := killPID(pid); err != nil {
+		return err
+	}
+	fmt.Printf("NapCat stopped (PID %d).\n", pid)
+	return nil
+}
+
+// findNapCatPID locates a NapCatWinBootMain.exe process whose executable
+// path is inside the given napcat directory.
+func findNapCatPID(dir string) (int, error) {
+	ps := `Get-Process NapCatWinBootMain -ErrorAction SilentlyContinue | ForEach-Object { $_.Id.ToString() + "," + $_.Path }`
+	out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
+	if err != nil {
+		return 0, fmt.Errorf("cannot enumerate NapCat processes: %w", err)
+	}
+	abs, _ := filepath.Abs(dir)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ",", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		pid, err := parseInt(parts[0])
+		exe := parts[1]
+		if err == nil && pid > 0 && (strings.HasPrefix(exe, abs) || strings.HasPrefix(exe, dir)) {
+			return pid, nil
+		}
+	}
+	return 0, errors.New("napcat process not found (is it running?)")
+}
+
+func parseInt(s string) (int, error) {
+	var n int
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("not a number: %q", s)
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }
 
 // downloadNapCat fetches the latest NapCat.Shell.zip from GitHub, extracts
