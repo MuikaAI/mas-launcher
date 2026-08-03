@@ -183,6 +183,9 @@ func (m *Manager) startCmd(args []string) error {
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
 		return errors.New("instance is already running")
 	}
+	if e := m.checkAndSign(repo); e != nil {
+		return e
+	}
 	if e = os.MkdirAll(filepath.Join(i.Path, "logs"), 0o700); e != nil {
 		return e
 	}

@@ -79,6 +79,10 @@ func run(args []string) error {
 		return m.initCmd(args[1:])
 	case "configure", "config":
 		return m.configureCmd(args[1:])
+	case "model", "models":
+		return m.modelCmd(args[1:])
+	case "license":
+		return m.licenseCmd(args[1:])
 	case "start":
 		return m.startCmd(args[1:])
 	case "stop":
@@ -108,6 +112,8 @@ func usage() {
 
   mas-launcher init [name]                         clone and prepare an instance
   mas-launcher configure [name]                    configure .env and model
+  mas-launcher model [name]                        configure models.yml (wizard or CRUD)
+  mas-launcher license [name] [--status]           view/sign the license agreement
   mas-launcher start [name] [--foreground]         start Core and Bot
   mas-launcher stop|restart [name]                 manage processes
   mas-launcher status [name] [--json]              inspect state
