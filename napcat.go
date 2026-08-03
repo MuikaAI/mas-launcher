@@ -160,21 +160,32 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		}
 	}
 
-	// Build the start command. In non-admin mode the window is hidden
-	// with /MIN unless --show-napcat was passed. Admin mode always shows
-	// the window (UAC popup is unavoidable).
-	startArgs := []string{"/c", "start", ""}
+	// Build the launch command. Hidden mode (default) avoids the
+	// terminal window entirely by firing the bat via cmd /c without
+	// 'start', combined with HideWindow (CREATE_NO_WINDOW).
+	var c *exec.Cmd
 	if !showWindow && !admin {
-		startArgs = append(startArgs, "/MIN")
-	}
-	startArgs = append(startArgs, bat)
-	if qq != "" {
-		startArgs = append(startArgs, qq)
-	}
-	c := exec.Command("cmd", startArgs...)
-	c.Dir = dir
-	if err := c.Run(); err != nil {
-		return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
+		args := []string{"/c", bat}
+		if qq != "" {
+			args = append(args, qq)
+		}
+		c = exec.Command("cmd", args...)
+		c.Dir = dir
+		hideWindow(c)
+		if err := c.Start(); err != nil {
+			return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
+		}
+		fmt.Printf("NapCat started in background (PID %d).\n", c.Process.Pid)
+	} else {
+		startArgs := []string{"/c", "start", "", bat}
+		if qq != "" {
+			startArgs = append(startArgs, qq)
+		}
+		c = exec.Command("cmd", startArgs...)
+		c.Dir = dir
+		if err := c.Run(); err != nil {
+			return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
+		}
 	}
 
 	// Wait briefly for NapCat to initialise, then print the WebUI address
