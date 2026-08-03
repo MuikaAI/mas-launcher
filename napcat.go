@@ -16,12 +16,13 @@ import (
 	"time"
 )
 
-// napcatCmd implements `mas-launcher napcat [name] [--show-napcat]`.
+// napcatCmd implements `mas-launcher napcat [name] [--show-napcat] [--admin]`.
 func (m *Manager) napcatCmd(args []string) error {
 	name, rest := instanceName(args)
 	fs := flag.NewFlagSet("napcat", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showWindow := fs.Bool("show-napcat", false, "show NapCat terminal window")
+	admin := fs.Bool("admin", false, "run with administrator privileges (UAC, window visible)")
 	if err := fs.Parse(rest); err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func (m *Manager) napcatCmd(args []string) error {
 
 	switch runtime.GOOS {
 	case "windows":
-		dir, qq, err := napcatWindows(i.Path, i.NapCatDir, i.NapCatQQ, *showWindow)
+		dir, qq, err := napcatWindows(i.Path, i.NapCatDir, i.NapCatQQ, *showWindow, *admin)
 		if err != nil {
 			return err
 		}
@@ -76,8 +77,12 @@ func napcatConfigInfo(repo string, i Instance) {
 
 // napcatWindows guides the user through NapCat.Shell setup, remembers the
 // directory and QQ number across runs, auto-configures the Onebot v11
-// reverse-WebSocket client, and launches NapCat minimized.
-func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow bool) (dir, qq string, _ error) {
+// reverse-WebSocket client, and launches NapCat.
+//
+// By default NapCat runs without admin privileges (launcher-user.bat) so
+// there is no UAC popup and the window can be hidden with /MIN. Pass admin
+// to use the privileged launcher.bat (UAC elevation, window always visible).
+func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin bool) (dir, qq string, _ error) {
 	if defaultDir == "" {
 		defaultDir = filepath.Join(instancePath, "napcat")
 	}
@@ -117,15 +122,24 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow bool) 
 	}
 	qq = strings.TrimSpace(qq)
 
-	// Pick the right launcher script
-	bat := filepath.Join(dir, "launcher.bat")
-	if _, err := os.Stat(bat); err != nil {
-		bat = filepath.Join(dir, "launcher-win10.bat")
+	// Pick the right launcher script. Default to the non-admin variant
+	// so we can run in the background without a UAC popup.
+	var bat string
+	if admin {
+		bat = filepath.Join(dir, "launcher.bat")
 		if _, err := os.Stat(bat); err != nil {
-			fmt.Println("launcher.bat not found in", dir)
-			fmt.Println("Make sure NapCat.Shell is extracted and try again.")
-			return dir, qq, nil
+			bat = filepath.Join(dir, "launcher-win10.bat")
 		}
+	} else {
+		bat = filepath.Join(dir, "launcher-user.bat")
+		if _, err := os.Stat(bat); err != nil {
+			bat = filepath.Join(dir, "launcher-win10-user.bat")
+		}
+	}
+	if _, err := os.Stat(bat); err != nil {
+		fmt.Println("launcher script not found in", dir)
+		fmt.Println("Make sure NapCat.Shell is extracted and try again.")
+		return dir, qq, nil
 	}
 
 	// Auto-configure Onebot v11 reverse WebSocket client so NapCat
@@ -136,10 +150,11 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow bool) 
 		}
 	}
 
-	// Build the start command. Use /MIN to hide the terminal window unless
-	// the user explicitly asked to see it (--show-napcat).
+	// Build the start command. In non-admin mode the window is hidden
+	// with /MIN unless --show-napcat was passed. Admin mode always shows
+	// the window (UAC popup is unavoidable).
 	startArgs := []string{"/c", "start", ""}
-	if !showWindow {
+	if !showWindow && !admin {
 		startArgs = append(startArgs, "/MIN")
 	}
 	startArgs = append(startArgs, bat)
