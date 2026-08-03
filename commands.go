@@ -92,7 +92,7 @@ func (m *Manager) defaultFiles(repo string, i Instance) error {
 		if e = os.MkdirAll(filepath.Dir(models), 0o700); e != nil {
 			return e
 		}
-		return os.WriteFile(models, []byte("# Configure a model with mas-launcher configure\n"), 0o600)
+		return os.WriteFile(models, []byte(modelSeedComment), 0o600)
 	}
 	return nil
 }
@@ -153,11 +153,11 @@ func (m *Manager) configureCmd(args []string) error {
 		}
 		text := fmt.Sprintf("default:\n  provider: %s\n  model_name: %s\n  api_key: %s\n  default: true\n", *provider, *model, *key)
 		if *base != "" {
-			text += fmt.Sprintf("  base_url: %s\n", *base)
+			text += fmt.Sprintf("  api_host: %s\n", *base)
 		}
 		return os.WriteFile(filepath.Join(repo, "configs", "models.yml"), []byte(text), 0o600)
 	}
-	fmt.Println("Configuration saved. Add model settings to configs/models.yml or pass model flags.")
+	fmt.Println("Configuration saved. Add model settings with: mas-launcher model")
 	return nil
 }
 

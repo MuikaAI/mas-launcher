@@ -1,3 +1,5 @@
 .gocache/
 dist/
 mas-launcher-*
+mas-launcher
+mas-launcher.exe
