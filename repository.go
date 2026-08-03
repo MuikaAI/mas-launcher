@@ -16,21 +16,24 @@ func fetchRepository(repo, ref, dest string) error {
 	if _, err := os.Stat(filepath.Join(dest, "pyproject.toml")); err == nil {
 		return nil
 	}
-	if strings.HasPrefix(repo, "https://github.com/") {
-		parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(repo, "https://github.com/"), ".git"), "/")
-		if len(parts) >= 2 {
-			url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", parts[0], parts[1], ref)
-			if err := downloadZip(url, dest); err == nil {
-				return nil
-			}
+	// Prefer a git clone so instances stay updatable (mas-launcher update
+	// requires a checkout). Fall back to a GitHub zip only without git.
+	if _, err := exec.LookPath("git"); err == nil {
+		c := exec.Command("git", "clone", "--depth", "1", "--branch", ref, repo, dest)
+		c.Stdout, c.Stderr = os.Stdout, os.Stderr
+		if err := c.Run(); err == nil {
+			return nil
 		}
 	}
-	if _, err := exec.LookPath("git"); err != nil {
+	if !strings.HasPrefix(repo, "https://github.com/") {
 		return errors.New("cannot fetch repository; use a GitHub URL or install Git")
 	}
-	c := exec.Command("git", "clone", "--depth", "1", "--branch", ref, repo, dest)
-	c.Stdout, c.Stderr = os.Stdout, os.Stderr
-	return c.Run()
+	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(repo, "https://github.com/"), ".git"), "/")
+	if len(parts) < 2 {
+		return errors.New("cannot fetch repository; use a GitHub URL or install Git")
+	}
+	url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", parts[0], parts[1], ref)
+	return downloadZip(url, dest)
 }
 func downloadZip(url, dest string) error {
 	r, err := http.Get(url)
