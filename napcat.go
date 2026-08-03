@@ -305,26 +305,50 @@ func stopNapCat(dir string) error {
 // findNapCatPID locates a NapCatWinBootMain.exe process whose executable
 // path is inside the given napcat directory.
 func findNapCatPID(dir string) (int, error) {
-	ps := `Get-Process NapCatWinBootMain -ErrorAction SilentlyContinue | ForEach-Object { $_.Id.ToString() + "," + $_.Path }`
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
+	// Step 1 — find candidate PIDs with tasklist (reliable, no name
+	// truncation issue like Get-Process has with 17-char names).
+	out, err := exec.Command("tasklist", "/fi", "IMAGENAME eq NapCatWinBootMain.exe", "/fo", "csv", "/nh").Output()
 	if err != nil {
 		return 0, fmt.Errorf("cannot enumerate NapCat processes: %w", err)
 	}
-	abs, _ := filepath.Abs(dir)
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	var pids []int
+	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" {
+		if line == "" || !strings.Contains(line, "NapCat") {
 			continue
 		}
-		parts := strings.SplitN(line, ",", 2)
-		if len(parts) != 2 {
+		// CSV: "NapCatWinBootMain.exe","67572","Console","2","4,616 K"
+		cols := strings.Split(line, `","`)
+		if len(cols) < 2 {
 			continue
 		}
-		pid, err := parseInt(parts[0])
-		exe := parts[1]
-		if err == nil && pid > 0 && (strings.HasPrefix(exe, abs) || strings.HasPrefix(exe, dir)) {
+		pidStr := strings.Trim(cols[1], `"`)
+		if pid, err := parseInt(pidStr); err == nil && pid > 0 {
+			pids = append(pids, pid)
+		}
+	}
+
+	// Step 2 — verify which PID belongs to our napcat directory.
+	abs, _ := filepath.Abs(dir)
+	for _, pid := range pids {
+		ps := fmt.Sprintf(`(Get-Process -Id %d -ErrorAction SilentlyContinue).Path`, pid)
+		pathOut, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
+		if err != nil {
+			continue
+		}
+		exe := strings.TrimSpace(string(pathOut))
+		if strings.HasPrefix(exe, abs) || strings.HasPrefix(exe, dir) {
 			return pid, nil
 		}
+	}
+
+	// Step 3 — if path verification failed but we have exactly one PID,
+	// trust it (the machine likely only runs one NapCat instance).
+	if len(pids) == 1 {
+		return pids[0], nil
+	}
+	if len(pids) > 1 {
+		return 0, fmt.Errorf("multiple NapCat processes found (%v); stop manually", pids)
 	}
 	return 0, errors.New("napcat process not found (is it running?)")
 }
