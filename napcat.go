@@ -40,14 +40,17 @@ func (m *Manager) napcatCmd(args []string) error {
 	}
 }
 
-// napcatConfigInfo prints the Onebot V11 connection details and IPC secret
-// so any compatible protocol implementation can connect. Also called from
-// startCmd after Core + Bot are up.
+// napcatConfigInfo prints the Onebot V11 listening address (reverse WebSocket
+// — the protocol implementation connects as a client) and Core connection
+// details. Called from startCmd after Core + Bot are up, and from napcatCmd.
 func napcatConfigInfo(repo string, i Instance) {
 	env := parseEnv(filepath.Join(repo, ".env"))
-	fmt.Println("─ Onebot V11 connection info ─")
-	fmt.Printf("  WebSocket:   ws://%s:3001\n", i.Host)
-	fmt.Printf("  Core:        ws://%s:%d/ws\n", i.Host, i.Port)
+	fmt.Println("─ Onebot V11 (reverse WebSocket) ─")
+	fmt.Printf("  Listen:   ws://%s:8080/onebot/v11/\n", i.Host)
+	fmt.Println("  The protocol implementation (e.g. NapCat) connects here as a WebSocket client.")
+	fmt.Println()
+	fmt.Println("─ Core ─")
+	fmt.Printf("  WebSocket:   ws://%s:%d/ws\n", i.Host, i.Port)
 	if s := env["IPC_SECRET"]; s != "" {
 		fmt.Printf("  IPC Secret:  %s\n", s)
 	}
