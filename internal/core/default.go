@@ -1,9 +1,12 @@
-package main
+package core
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
+	"github.com/MuikaAI/mas-launcher/internal/models"
 )
 
 // envCheckIDs is the stable order in which environment completeness is
@@ -26,11 +29,11 @@ func (m *Manager) envStatus(repo string) ([]string, error) {
 		// by "env-file", so each id maps to exactly one fix.
 		missing = append(missing, "master-id")
 	}
-	mf, err := loadModelFile(modelsPath(repo))
+	mf, err := models.LoadModelFile(models.ModelsPath(repo))
 	if err != nil {
 		return nil, err
 	}
-	if !hasAnyDefault(mf) {
+	if !models.HasAnyDefault(mf) {
 		missing = append(missing, "model")
 	}
 	return missing, nil
@@ -42,7 +45,7 @@ func (m *Manager) envStatus(repo string) ([]string, error) {
 func (m *Manager) defaultCmd(args []string) error {
 	const name = "default"
 	if _, ok := m.Config.Instances[name]; !ok {
-		fmt.Println(T("No default instance found; creating one..."))
+		fmt.Println(i18n.T("No default instance found; creating one..."))
 		if err := m.initCmd(nil); err != nil {
 			return err
 		}
@@ -52,7 +55,7 @@ func (m *Manager) defaultCmd(args []string) error {
 		return err
 	}
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
-		fmt.Println(T("Instance already running."))
+		fmt.Println(i18n.T("Instance already running."))
 		return nil
 	}
 	missing, err := m.envStatus(repo)
@@ -65,10 +68,10 @@ func (m *Manager) defaultCmd(args []string) error {
 	}
 	for _, id := range envCheckIDs {
 		if !need[id] {
-			fmt.Printf(T("  ok: %s\n"), T(id))
+			fmt.Printf(i18n.T("  ok: %s\n"), i18n.T(id))
 			continue
 		}
-		fmt.Printf(T("  %s missing; fixing...\n"), T(id))
+		fmt.Printf(i18n.T("  %s missing; fixing...\n"), i18n.T(id))
 		var e error
 		switch id {
 		case "python":
@@ -85,7 +88,7 @@ func (m *Manager) defaultCmd(args []string) error {
 		}
 	}
 	if rest, e := m.envStatus(repo); e == nil && len(rest) > 0 {
-		fmt.Printf(T("Warning: still missing: %v\n"), rest)
+		fmt.Printf(i18n.T("Warning: still missing: %v\n"), rest)
 	}
 	return m.startCmd(nil)
 }

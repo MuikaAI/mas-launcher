@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"bytes"
@@ -12,9 +12,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// modelSeedComment is written to configs/models.yml when no model configs
+// ModelSeedComment is written to configs/models.yml when no model configs
 // remain, so the file stays parseable and the next run starts fresh.
-const modelSeedComment = "# Configure a model with mas-launcher model\n"
+const ModelSeedComment = "# Configure a model with mas-launcher model\n"
 
 // ModelEntry is a single model config block in configs/models.yml.
 // It is a map so unknown/legacy keys (think, function_call, ...) survive
@@ -24,56 +24,56 @@ type ModelEntry map[string]any
 // ModelFile is configs/models.yml: an alias (config name) -> model entry.
 type ModelFile map[string]ModelEntry
 
-// providerSpec describes one embedded provider for the model wizard.
-type providerSpec struct {
-	key         string // menu id / flag value
-	label       string // human label
-	provider    string // value written to the provider: field
-	defaultHost string // api_host written to the file; "" = omit
-	listBase    string // fixed list URL; "{host}" is substituted; "" = derive openai-compatible
-	auth        string // bearer | query | none
+// ProviderSpec describes one embedded provider for the model wizard.
+type ProviderSpec struct {
+	Key         string // menu id / flag value
+	Label       string // human label
+	Provider    string // value written to the provider: field
+	DefaultHost string // api_host written to the file; "" = omit
+	ListBase    string // fixed list URL; "{host}" is substituted; "" = derive openai-compatible
+	Auth        string // bearer | query | none
 }
 
-// embeddedProviders are the built-in providers offered by the wizard. Only
+// EmbeddedProviders are the built-in providers offered by the wizard. Only
 // openai/dashscope/gemini/ollama map to an app provider module; kimi/glm/
 // deepseek are OpenAI-compatible and must be written as provider "Openai"
 // plus api_host.
-var embeddedProviders = []providerSpec{
-	{key: "openai", label: "OpenAI", provider: "Openai", defaultHost: "https://api.openai.com/v1", auth: "bearer"},
-	{key: "kimi", label: "Kimi (Moonshot)", provider: "Openai", defaultHost: "https://api.moonshot.cn/v1", auth: "bearer"},
-	{key: "glm", label: "GLM (Zhipu AI)", provider: "Openai", defaultHost: "https://open.bigmodel.cn/api/paas/v4", auth: "bearer"},
-	{key: "deepseek", label: "DeepSeek", provider: "Openai", defaultHost: "https://api.deepseek.com", auth: "bearer"},
-	{key: "dashscope", label: "DashScope (Alibaba)", provider: "Dashscope", listBase: "https://dashscope.aliyuncs.com/compatible-mode/v1/models", auth: "bearer"},
-	{key: "gemini", label: "Gemini (Google)", provider: "Gemini", listBase: "https://generativelanguage.googleapis.com/v1beta/models", auth: "query"},
-	{key: "ollama", label: "Ollama (local)", provider: "Ollama", defaultHost: "http://localhost:11434", listBase: "{host}/api/tags", auth: "none"},
+var EmbeddedProviders = []ProviderSpec{
+	{Key: "openai", Label: "OpenAI", Provider: "Openai", DefaultHost: "https://api.openai.com/v1", Auth: "bearer"},
+	{Key: "kimi", Label: "Kimi (Moonshot)", Provider: "Openai", DefaultHost: "https://api.moonshot.cn/v1", Auth: "bearer"},
+	{Key: "glm", Label: "GLM (Zhipu AI)", Provider: "Openai", DefaultHost: "https://open.bigmodel.cn/api/paas/v4", Auth: "bearer"},
+	{Key: "deepseek", Label: "DeepSeek", Provider: "Openai", DefaultHost: "https://api.deepseek.com", Auth: "bearer"},
+	{Key: "dashscope", Label: "DashScope (Alibaba)", Provider: "Dashscope", ListBase: "https://dashscope.aliyuncs.com/compatible-mode/v1/models", Auth: "bearer"},
+	{Key: "gemini", Label: "Gemini (Google)", Provider: "Gemini", ListBase: "https://generativelanguage.googleapis.com/v1beta/models", Auth: "query"},
+	{Key: "ollama", Label: "Ollama (local)", Provider: "Ollama", DefaultHost: "http://localhost:11434", ListBase: "{host}/api/tags", Auth: "none"},
 }
 
-// findProvider returns the embedded provider with the given key, or nil.
-func findProvider(key string) *providerSpec {
-	for i := range embeddedProviders {
-		if embeddedProviders[i].key == key {
-			return &embeddedProviders[i]
+// FindProvider returns the embedded provider with the given key, or nil.
+func FindProvider(key string) *ProviderSpec {
+	for i := range EmbeddedProviders {
+		if EmbeddedProviders[i].Key == key {
+			return &EmbeddedProviders[i]
 		}
 	}
 	return nil
 }
 
 // listURLs returns candidate URLs to fetch the model list for a provider.
-func (s providerSpec) listURLs(host string) []string {
-	if s.listBase != "" {
-		return []string{strings.ReplaceAll(s.listBase, "{host}", host)}
+func (s ProviderSpec) listURLs(host string) []string {
+	if s.ListBase != "" {
+		return []string{strings.ReplaceAll(s.ListBase, "{host}", host)}
 	}
-	return openaiModelURLs(host)
+	return OpenaiModelURLs(host)
 }
 
-// modelsPath returns the configs/models.yml path for a repo checkout.
-func modelsPath(repo string) string {
+// ModelsPath returns the configs/models.yml path for a repo checkout.
+func ModelsPath(repo string) string {
 	return filepath.Join(repo, "configs", "models.yml")
 }
 
-// loadModelFile reads and parses configs/models.yml. A missing file yields
+// LoadModelFile reads and parses configs/models.yml. A missing file yields
 // an empty map.
-func loadModelFile(path string) (ModelFile, error) {
+func LoadModelFile(path string) (ModelFile, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -91,8 +91,8 @@ func loadModelFile(path string) (ModelFile, error) {
 	return mf, nil
 }
 
-// saveModelFile marshals and writes configs/models.yml (2-space indent, 0600).
-func saveModelFile(path string, mf ModelFile) error {
+// SaveModelFile marshals and writes configs/models.yml (2-space indent, 0600).
+func SaveModelFile(path string, mf ModelFile) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -108,8 +108,8 @@ func saveModelFile(path string, mf ModelFile) error {
 	return os.WriteFile(path, buf.Bytes(), 0o600)
 }
 
-// getStr returns a key as a string, falling back to %v for non-strings.
-func (e ModelEntry) getStr(k string) string {
+// GetStr returns a key as a string, falling back to %v for non-strings.
+func (e ModelEntry) GetStr(k string) string {
 	v, ok := e[k]
 	if !ok || v == nil {
 		return ""
@@ -120,14 +120,14 @@ func (e ModelEntry) getStr(k string) string {
 	return fmt.Sprintf("%v", v)
 }
 
-// getBool returns a key as a bool (false when absent or non-bool).
-func (e ModelEntry) getBool(k string) bool {
+// GetBool returns a key as a bool (false when absent or non-bool).
+func (e ModelEntry) GetBool(k string) bool {
 	v, ok := e[k].(bool)
 	return ok && v
 }
 
-// getInt returns a key as an int, tolerating int/int64/float64 scalars.
-func (e ModelEntry) getInt(k string) int {
+// GetInt returns a key as an int, tolerating int/int64/float64 scalars.
+func (e ModelEntry) GetInt(k string) int {
 	switch v := e[k].(type) {
 	case int:
 		return v
@@ -139,8 +139,8 @@ func (e ModelEntry) getInt(k string) int {
 	return 0
 }
 
-// getFloat returns a key as a float64, tolerating int/int64/float64 scalars.
-func (e ModelEntry) getFloat(k string) float64 {
+// GetFloat returns a key as a float64, tolerating int/int64/float64 scalars.
+func (e ModelEntry) GetFloat(k string) float64 {
 	switch v := e[k].(type) {
 	case float64:
 		return v
@@ -152,8 +152,8 @@ func (e ModelEntry) getFloat(k string) float64 {
 	return 0
 }
 
-// modelDraft collects the fields the wizard knows about for one entry.
-type modelDraft struct {
+// ModelDraft collects the fields the wizard knows about for one entry.
+type ModelDraft struct {
 	Name         string
 	Provider     string
 	ModelName    string
@@ -177,7 +177,7 @@ type modelDraft struct {
 }
 
 // ToEntry builds a fresh ModelEntry from the draft, omitting unset optionals.
-func (d modelDraft) ToEntry() ModelEntry {
+func (d ModelDraft) ToEntry() ModelEntry {
 	e := ModelEntry{}
 	e["provider"] = d.Provider
 	if d.ModelName != "" {
@@ -239,7 +239,7 @@ func (d modelDraft) ToEntry() ModelEntry {
 
 // MergeInto overlays the draft's known keys onto an existing entry,
 // preserving any unknown/legacy keys for lossless modification.
-func (d modelDraft) MergeInto(existing ModelEntry) ModelEntry {
+func (d ModelDraft) MergeInto(existing ModelEntry) ModelEntry {
 	out := make(ModelEntry, len(existing)+8)
 	for k, v := range existing {
 		out[k] = v
@@ -251,16 +251,16 @@ func (d modelDraft) MergeInto(existing ModelEntry) ModelEntry {
 }
 
 // ToDraft pre-fills a draft from an existing entry (for the modify flow).
-func (e ModelEntry) ToDraft() modelDraft {
-	d := modelDraft{
-		Provider:     e.getStr("provider"),
-		ModelName:    e.getStr("model_name"),
-		APIKey:       e.getStr("api_key"),
-		APIHost:      e.getStr("api_host"),
-		Default:      e.getBool("default"),
-		Stream:       e.getBool("stream"),
-		Multimodal:   e.getBool("multimodal"),
-		OnlineSearch: e.getBool("online_search"),
+func (e ModelEntry) ToDraft() ModelDraft {
+	d := ModelDraft{
+		Provider:     e.GetStr("provider"),
+		ModelName:    e.GetStr("model_name"),
+		APIKey:       e.GetStr("api_key"),
+		APIHost:      e.GetStr("api_host"),
+		Default:      e.GetBool("default"),
+		Stream:       e.GetBool("stream"),
+		Multimodal:   e.GetBool("multimodal"),
+		OnlineSearch: e.GetBool("online_search"),
 	}
 	d.EnableThinking = boolPtr(e, "enable_thinking")
 	d.ThinkingBudget = intPtr(e, "thinking_budget")
@@ -283,7 +283,7 @@ func floatPtr(e ModelEntry, k string) *float64 {
 	if _, ok := e[k]; !ok {
 		return nil
 	}
-	v := e.getFloat(k)
+	v := e.GetFloat(k)
 	return &v
 }
 
@@ -291,7 +291,7 @@ func intPtr(e ModelEntry, k string) *int {
 	if _, ok := e[k]; !ok {
 		return nil
 	}
-	v := e.getInt(k)
+	v := e.GetInt(k)
 	return &v
 }
 
@@ -299,13 +299,13 @@ func boolPtr(e ModelEntry, k string) *bool {
 	if _, ok := e[k]; !ok {
 		return nil
 	}
-	v := e.getBool(k)
+	v := e.GetBool(k)
 	return &v
 }
 
-// modelNames returns the config names in sorted order (yaml.v3 re-marshals
+// ModelNames returns the config names in sorted order (yaml.v3 re-marshals
 // map keys sorted, so this matches the on-disk order).
-func modelNames(mf ModelFile) []string {
+func ModelNames(mf ModelFile) []string {
 	out := make([]string, 0, len(mf))
 	for n := range mf {
 		out = append(out, n)
@@ -314,28 +314,28 @@ func modelNames(mf ModelFile) []string {
 	return out
 }
 
-// hasAnyDefault reports whether any config is marked default.
-func hasAnyDefault(mf ModelFile) bool {
+// HasAnyDefault reports whether any config is marked default.
+func HasAnyDefault(mf ModelFile) bool {
 	for _, e := range mf {
-		if e.getBool("default") {
+		if e.GetBool("default") {
 			return true
 		}
 	}
 	return false
 }
 
-// firstDefault returns the first (alphabetical) config marked default.
-func firstDefault(mf ModelFile) string {
-	for _, n := range modelNames(mf) {
-		if mf[n].getBool("default") {
+// FirstDefault returns the first (alphabetical) config marked default.
+func FirstDefault(mf ModelFile) string {
+	for _, n := range ModelNames(mf) {
+		if mf[n].GetBool("default") {
 			return n
 		}
 	}
 	return ""
 }
 
-// setDefault marks name as the only default config, clearing the others.
-func setDefault(mf ModelFile, name string) {
+// SetDefault marks name as the only default config, clearing the others.
+func SetDefault(mf ModelFile, name string) {
 	for n, e := range mf {
 		if n == name {
 			e["default"] = true
@@ -345,23 +345,23 @@ func setDefault(mf ModelFile, name string) {
 	}
 }
 
-// ensureDefault guarantees a default exists when entries remain. It returns
+// EnsureDefault guarantees a default exists when entries remain. It returns
 // the effective default name ("" when there are no entries).
-func ensureDefault(mf ModelFile) string {
+func EnsureDefault(mf ModelFile) string {
 	if len(mf) == 0 {
 		return ""
 	}
-	if hasAnyDefault(mf) {
-		return firstDefault(mf)
+	if HasAnyDefault(mf) {
+		return FirstDefault(mf)
 	}
-	names := modelNames(mf)
-	setDefault(mf, names[0])
+	names := ModelNames(mf)
+	SetDefault(mf, names[0])
 	return names[0]
 }
 
-// defaultFromModelName suggests a config alias from a model id, e.g.
+// DefaultFromModelName suggests a config alias from a model id, e.g.
 // "deepseek-chat" -> "deepseek", "qwen2.5:7b" -> "qwen2".
-func defaultFromModelName(s string) string {
+func DefaultFromModelName(s string) string {
 	for _, sep := range []string{"/", ":", "-", "."} {
 		if i := strings.Index(s, sep); i > 0 {
 			s = s[:i]

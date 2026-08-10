@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
 )
 
 // trimSlash removes trailing slashes from a host URL.
@@ -15,10 +17,10 @@ func trimSlash(h string) string {
 	return strings.TrimRight(h, "/")
 }
 
-// openaiModelURLs returns candidate model-list endpoints for an
+// OpenaiModelURLs returns candidate model-list endpoints for an
 // OpenAI-compatible host, in order of preference. Hosts already ending in
 // /v1 need no fallback; bare roots (e.g. DeepSeek) try /models first.
-func openaiModelURLs(host string) []string {
+func OpenaiModelURLs(host string) []string {
 	base := trimSlash(host)
 	if strings.HasSuffix(base, "/v1") {
 		return []string{base + "/models"}
@@ -26,10 +28,10 @@ func openaiModelURLs(host string) []string {
 	return []string{base + "/models", base + "/v1/models"}
 }
 
-// fetchModelList retrieves the model list for a provider, trying each
+// FetchModelList retrieves the model list for a provider, trying each
 // candidate URL in order. It returns a deduplicated, sorted list of model
 // ids, or an error if every candidate failed or returned nothing useful.
-func fetchModelList(spec providerSpec, host, apiKey string) ([]string, error) {
+func FetchModelList(spec ProviderSpec, host, apiKey string) ([]string, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	var lastErr error
 	seen := map[string]bool{}
@@ -55,7 +57,7 @@ func fetchModelList(spec providerSpec, host, apiKey string) ([]string, error) {
 	}
 	if len(out) == 0 {
 		if lastErr == nil {
-			lastErr = fmt.Errorf(T("empty model list from %s"), host)
+			lastErr = fmt.Errorf(i18n.T("empty model list from %s"), host)
 		}
 		return nil, lastErr
 	}
@@ -65,15 +67,15 @@ func fetchModelList(spec providerSpec, host, apiKey string) ([]string, error) {
 
 // fetchOneModelList performs one GET and parses either OpenAI-style
 // {"data":[{"id":...}]} or gemini/ollama-style {"models":[{"name":...}]}.
-func fetchOneModelList(client *http.Client, spec providerSpec, u, apiKey string) ([]string, error) {
+func fetchOneModelList(client *http.Client, spec ProviderSpec, u, apiKey string) ([]string, error) {
 	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
-	if spec.auth == "bearer" && apiKey != "" {
+	if spec.Auth == "bearer" && apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	if spec.auth == "query" && apiKey != "" {
+	if spec.Auth == "query" && apiKey != "" {
 		q := req.URL.Query()
 		q.Set("key", apiKey)
 		req.URL.RawQuery = q.Encode()
@@ -99,7 +101,7 @@ func fetchOneModelList(client *http.Client, spec providerSpec, u, apiKey string)
 		} `json:"models"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf(T("%s: invalid JSON: %w"), u, err)
+		return nil, fmt.Errorf(i18n.T("%s: invalid JSON: %w"), u, err)
 	}
 	var ids []string
 	for _, m := range payload.Data {

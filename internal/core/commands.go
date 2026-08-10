@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bufio"
@@ -12,6 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
+	"github.com/MuikaAI/mas-launcher/internal/models"
+	"github.com/MuikaAI/mas-launcher/internal/repository"
 )
 
 func (m *Manager) initCmd(args []string) error {
@@ -24,15 +28,15 @@ func (m *Manager) initCmd(args []string) error {
 		return err
 	}
 	if _, ok := m.Config.Instances[name]; ok {
-		return fmt.Errorf(T("instance %q already exists"), name)
+		return fmt.Errorf(i18n.T("instance %q already exists"), name)
 	}
 	path := filepath.Join(m.Root, "instances", name)
 	repoDir := filepath.Join(path, "repo")
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return err
 	}
-	fmt.Println(T("Fetching project..."))
-	if err := fetchRepository(*repo, *ref, repoDir); err != nil {
+	fmt.Println(i18n.T("Fetching project..."))
+	if err := repository.FetchRepository(*repo, *ref, repoDir); err != nil {
 		return err
 	}
 	for _, dir := range []string{"logs", "runtime"} {
@@ -51,7 +55,7 @@ func (m *Manager) initCmd(args []string) error {
 	if err := m.defaultFiles(repoDir, i); err != nil {
 		return err
 	}
-	fmt.Printf(T("Instance %s created. Run: mas-launcher configure %s\n"), name, name)
+	fmt.Printf(i18n.T("Instance %s created. Run: mas-launcher configure %s\n"), name, name)
 	return nil
 }
 
@@ -60,7 +64,7 @@ func (m *Manager) ensureEnvironment(repo string) error {
 		return nil
 	}
 	if uv, e := exec.LookPath("uv"); e == nil {
-		fmt.Println(T("Installing dependencies with uv..."))
+		fmt.Println(i18n.T("Installing dependencies with uv..."))
 		return command(repo, uv, "sync", "--extra", "standard", "--extra", "nonebot")
 	}
 	for _, candidate := range []struct {
@@ -71,14 +75,14 @@ func (m *Manager) ensureEnvironment(repo string) error {
 		if e != nil {
 			continue
 		}
-		fmt.Println(T("uv not found; using system Python..."))
+		fmt.Println(i18n.T("uv not found; using system Python..."))
 		venv := append(append([]string{}, candidate.args...), "-m", "venv", ".venv")
 		if e = command(repo, p, venv...); e != nil {
 			continue
 		}
 		return command(repo, python(repo), "-m", "pip", "install", "-e", ".[standard,nonebot]")
 	}
-	return errors.New(T("uv or Python 3.10+ is required; install uv and retry"))
+	return errors.New(i18n.T("uv or Python 3.10+ is required; install uv and retry"))
 }
 func (m *Manager) defaultFiles(repo string, i Instance) error {
 	if _, e := os.Stat(filepath.Join(repo, ".env")); errors.Is(e, os.ErrNotExist) {
@@ -87,12 +91,12 @@ func (m *Manager) defaultFiles(repo string, i Instance) error {
 			return e
 		}
 	}
-	models := filepath.Join(repo, "configs", "models.yml")
-	if _, e := os.Stat(models); errors.Is(e, os.ErrNotExist) {
-		if e = os.MkdirAll(filepath.Dir(models), 0o700); e != nil {
+	modelsPath := filepath.Join(repo, "configs", "models.yml")
+	if _, e := os.Stat(modelsPath); errors.Is(e, os.ErrNotExist) {
+		if e = os.MkdirAll(filepath.Dir(modelsPath), 0o700); e != nil {
 			return e
 		}
-		return os.WriteFile(models, []byte(modelSeedComment), 0o600)
+		return os.WriteFile(modelsPath, []byte(models.ModelSeedComment), 0o600)
 	}
 	return nil
 }
@@ -134,14 +138,14 @@ func (m *Manager) configureCmd(args []string) error {
 		}
 		return ask(label, current)
 	}
-	if values["MASTER_ID"], e = pick(T("Master ID"), values["MASTER_ID"], *master); e != nil {
+	if values["MASTER_ID"], e = pick(i18n.T("Master ID"), values["MASTER_ID"], *master); e != nil {
 		return e
 	}
 	values["SUPERUSERS"] = fmt.Sprintf("[%q]", values["MASTER_ID"])
-	if values["IPC_SECRET"], e = pick(T("IPC_SECRET"), values["IPC_SECRET"], *ipc); e != nil {
+	if values["IPC_SECRET"], e = pick(i18n.T("IPC_SECRET"), values["IPC_SECRET"], *ipc); e != nil {
 		return e
 	}
-	if values["CORE_WS_URL"], e = pick(T("Core WebSocket URL"), values["CORE_WS_URL"], *core); e != nil {
+	if values["CORE_WS_URL"], e = pick(i18n.T("Core WebSocket URL"), values["CORE_WS_URL"], *core); e != nil {
 		return e
 	}
 	if e = writeEnv(filepath.Join(repo, ".env"), values); e != nil {
@@ -149,7 +153,7 @@ func (m *Manager) configureCmd(args []string) error {
 	}
 	if *provider != "" || *model != "" || *key != "" {
 		if *provider == "" || *model == "" || *key == "" {
-			return errors.New(T("--provider, --model and --api-key are required together"))
+			return errors.New(i18n.T("--provider, --model and --api-key are required together"))
 		}
 		text := fmt.Sprintf("default:\n  provider: %s\n  model_name: %s\n  api_key: %s\n  default: true\n", *provider, *model, *key)
 		if *base != "" {
@@ -157,7 +161,7 @@ func (m *Manager) configureCmd(args []string) error {
 		}
 		return os.WriteFile(filepath.Join(repo, "configs", "models.yml"), []byte(text), 0o600)
 	}
-	fmt.Println(T("Configuration saved. Add model settings with: mas-launcher model"))
+	fmt.Println(i18n.T("Configuration saved. Add model settings with: mas-launcher model"))
 	return nil
 }
 
@@ -178,10 +182,10 @@ func (m *Manager) startCmd(args []string) error {
 		i.Bot = false
 	}
 	if _, e = os.Stat(python(repo)); e != nil {
-		return errors.New(T("Python environment missing; run init first"))
+		return errors.New(i18n.T("Python environment missing; run init first"))
 	}
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
-		return errors.New(T("instance is already running"))
+		return errors.New(i18n.T("instance is already running"))
 	}
 	if e := m.checkAndSign(repo); e != nil {
 		return e
@@ -189,7 +193,7 @@ func (m *Manager) startCmd(args []string) error {
 	if e = os.MkdirAll(filepath.Join(i.Path, "logs"), 0o700); e != nil {
 		return e
 	}
-	state := State{SchemaVersion: 1, Instance: name, StartedAt: time.Now().UTC(), Commit: gitOutput(repo, "rev-parse", "HEAD")}
+	state := State{SchemaVersion: 1, Instance: name, StartedAt: time.Now().UTC(), Commit: repository.GitOutput(repo, "rev-parse", "HEAD")}
 	start := func(label, script, log string, args ...string) (int, error) {
 		f, e := os.OpenFile(filepath.Join(i.Path, "logs", log), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if e != nil {
@@ -202,14 +206,14 @@ func (m *Manager) startCmd(args []string) error {
 			return 0, e
 		}
 		f.Close()
-		fmt.Printf(T("%s started (PID %d)\n"), label, c.Process.Pid)
+		fmt.Printf(i18n.T("%s started (PID %d)\n"), label, c.Process.Pid)
 		return c.Process.Pid, nil
 	}
-	if state.CorePID, e = start(T("Core"), "core_main.py", "core.log", "--host", i.Host, "--port", fmt.Sprint(i.Port)); e != nil {
+	if state.CorePID, e = start(i18n.T("Core"), "core_main.py", "core.log", "--host", i.Host, "--port", fmt.Sprint(i.Port)); e != nil {
 		return e
 	}
 	if i.Bot {
-		if state.BotPID, e = start(T("Bot"), "bot.py", "bot.log"); e != nil {
+		if state.BotPID, e = start(i18n.T("Bot"), "bot.py", "bot.log"); e != nil {
 			_ = killPID(state.CorePID)
 			return e
 		}
@@ -219,7 +223,7 @@ func (m *Manager) startCmd(args []string) error {
 	}
 	napcatConfigInfo(repo, i)
 	if !*foreground {
-		fmt.Printf(T("Instance %s is running in background.\n"), name)
+		fmt.Printf(i18n.T("Instance %s is running in background.\n"), name)
 		return nil
 	}
 	<-waitSignal().Done()
@@ -249,7 +253,7 @@ func (m *Manager) stopState(name string, s State) error {
 		_ = killPID(s.CorePID)
 	}
 	_ = m.clearState(name)
-	fmt.Printf(T("Instance %s stopped.\n"), name)
+	fmt.Printf(i18n.T("Instance %s stopped.\n"), name)
 	return nil
 }
 func (m *Manager) statusCmd(args []string) error {
@@ -271,7 +275,7 @@ func (m *Manager) statusCmd(args []string) error {
 		fmt.Println(string(b))
 		return nil
 	}
-	fmt.Printf(T("Instance: %s\nPath: %s\nCore: %v (PID %d)\nBot: %v (PID %d)\nCommit: %s\n"), name, i.Path, v["core_running"], s.CorePID, v["bot_running"], s.BotPID, s.Commit)
+	fmt.Printf(i18n.T("Instance: %s\nPath: %s\nCore: %v (PID %d)\nBot: %v (PID %d)\nCommit: %s\n"), name, i.Path, v["core_running"], s.CorePID, v["bot_running"], s.BotPID, s.Commit)
 	return nil
 }
 func (m *Manager) logsCmd(args []string) error {
@@ -292,7 +296,7 @@ func (m *Manager) logsCmd(args []string) error {
 		}
 	}
 	if service != "core" && service != "bot" {
-		return errors.New(T("service must be core or bot"))
+		return errors.New(i18n.T("service must be core or bot"))
 	}
 	i, _, e := m.instance(name)
 	if e != nil {
@@ -329,16 +333,16 @@ func (m *Manager) updateCmd(args []string) error {
 		return e
 	}
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
-		return errors.New(T("stop the instance before updating"))
+		return errors.New(i18n.T("stop the instance before updating"))
 	}
-	if gitOutput(repo, "status", "--porcelain") != "" {
-		return errors.New(T("working tree is dirty; update refused"))
+	if repository.GitOutput(repo, "status", "--porcelain") != "" {
+		return errors.New(i18n.T("working tree is dirty; update refused"))
 	}
 	if ref == "" {
 		ref = m.Config.Ref
 	}
 	if _, e = exec.LookPath("git"); e != nil {
-		return errors.New(T("Git is required for update"))
+		return errors.New(i18n.T("Git is required for update"))
 	}
 	for _, args := range [][]string{{"fetch", "--depth", "1", "origin", ref}, {"checkout", "-B", ref, "FETCH_HEAD"}} {
 		c := exec.Command("git", args...)
@@ -357,9 +361,9 @@ func (m *Manager) doctorCmd(args []string) error {
 	}
 	for _, check := range []struct{ label, path string }{{"project", filepath.Join(repo, "pyproject.toml")}, {"Python", python(repo)}, {"config", filepath.Join(repo, ".env")}} {
 		if _, e = os.Stat(check.path); e == nil {
-			fmt.Printf(T("%s: ok\n"), T(check.label))
+			fmt.Printf(i18n.T("%s: ok\n"), i18n.T(check.label))
 		} else {
-			fmt.Printf(T("%s: missing\n"), T(check.label))
+			fmt.Printf(i18n.T("%s: missing\n"), i18n.T(check.label))
 		}
 	}
 	return nil
@@ -371,15 +375,15 @@ func (m *Manager) removeCmd(args []string) error {
 		return e
 	}
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
-		return errors.New(T("stop the instance before removing it"))
+		return errors.New(i18n.T("stop the instance before removing it"))
 	}
-	fmt.Printf(T("Type yes to remove %s: "), name)
+	fmt.Printf(i18n.T("Type yes to remove %s: "), name)
 	var answer string
 	if _, e = fmt.Scanln(&answer); e != nil {
 		return e
 	}
 	if strings.ToLower(answer) != "yes" {
-		return errors.New(T("cancelled"))
+		return errors.New(i18n.T("cancelled"))
 	}
 	if e = os.RemoveAll(i.Path); e != nil {
 		return e

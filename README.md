@@ -6,7 +6,7 @@
 
 ```bash
 go test ./...
-go build -trimpath -ldflags "-s -w -X main.version=dev" -o mas-launcher .
+go build -trimpath -ldflags "-s -w -X github.com/MuikaAI/mas-launcher/internal/core.version=dev" -o mas-launcher ./cmd/mas-launcher
 ```
 
 ## 快速开始

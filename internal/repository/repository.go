@@ -1,4 +1,4 @@
-package main
+package repository
 
 import (
 	"archive/zip"
@@ -10,9 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
 )
 
-func fetchRepository(repo, ref, dest string) error {
+func FetchRepository(repo, ref, dest string) error {
 	if _, err := os.Stat(filepath.Join(dest, "pyproject.toml")); err == nil {
 		return nil
 	}
@@ -26,11 +28,11 @@ func fetchRepository(repo, ref, dest string) error {
 		}
 	}
 	if !strings.HasPrefix(repo, "https://github.com/") {
-		return errors.New(T("cannot fetch repository; use a GitHub URL or install Git"))
+		return errors.New(i18n.T("cannot fetch repository; use a GitHub URL or install Git"))
 	}
 	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(repo, "https://github.com/"), ".git"), "/")
 	if len(parts) < 2 {
-		return errors.New(T("cannot fetch repository; use a GitHub URL or install Git"))
+		return errors.New(i18n.T("cannot fetch repository; use a GitHub URL or install Git"))
 	}
 	url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", parts[0], parts[1], ref)
 	return downloadZip(url, dest)
@@ -42,7 +44,7 @@ func downloadZip(url, dest string) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf(T("repository download failed: %s"), r.Status)
+		return fmt.Errorf(i18n.T("repository download failed: %s"), r.Status)
 	}
 	tmp, err := os.CreateTemp("", "mas-launcher-*.zip")
 	if err != nil {
@@ -63,7 +65,7 @@ func downloadZip(url, dest string) error {
 	}
 	defer z.Close()
 	if len(z.File) == 0 {
-		return errors.New(T("empty repository archive"))
+		return errors.New(i18n.T("empty repository archive"))
 	}
 	prefix := strings.Split(filepath.ToSlash(z.File[0].Name), "/")[0] + "/"
 	for _, f := range z.File {
@@ -77,7 +79,7 @@ func downloadZip(url, dest string) error {
 		}
 		target := filepath.Join(dest, filepath.FromSlash(rel))
 		if !within(dest, target) {
-			return errors.New(T("archive contains an invalid path"))
+			return errors.New(i18n.T("archive contains an invalid path"))
 		}
 		if strings.HasSuffix(n, "/") {
 			if err := os.MkdirAll(target, 0o700); err != nil {
@@ -115,7 +117,7 @@ func within(root, target string) bool {
 	rel, e := filepath.Rel(r, t)
 	return e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
-func gitOutput(dir string, args ...string) string {
+func GitOutput(dir string, args ...string) string {
 	c := exec.Command("git", args...)
 	c.Dir = dir
 	b, e := c.Output()

@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bufio"
@@ -9,6 +9,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
+	"github.com/MuikaAI/mas-launcher/internal/models"
 )
 
 // modelCmd implements `mas-launcher model [name]`.
@@ -18,7 +21,7 @@ func (m *Manager) modelCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	path := modelsPath(repo)
+	path := models.ModelsPath(repo)
 
 	fs := flag.NewFlagSet("model", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -48,7 +51,7 @@ func (m *Manager) modelCmd(args []string) error {
 		return m.modelSetDefault(path, *setDefault)
 	case *cname != "":
 		if *provider == "" || *model == "" {
-			return errors.New(T("--provider and --model are required with --name"))
+			return errors.New(i18n.T("--provider and --model are required with --name"))
 		}
 		return m.modelWrite(path, *cname, *provider, *model, *apiKey, *apiHost, *stream, *temperature, *maxTokens, *makeDefault)
 	}
@@ -58,12 +61,12 @@ func (m *Manager) modelCmd(args []string) error {
 // modelWizard routes to the fresh-init flow (Flow A) or the CRUD menu
 // (Flow B) depending on whether any configs exist.
 func (m *Manager) modelWizard(path string) error {
-	mf, err := loadModelFile(path)
+	mf, err := models.LoadModelFile(path)
 	if err != nil {
 		return err
 	}
 	if len(mf) == 0 {
-		fmt.Println(T("No model configs found in configs/models.yml."))
+		fmt.Println(i18n.T("No model configs found in configs/models.yml."))
 		p := newPrompt()
 		name, err := m.wizardCreate(p, mf)
 		if err != nil {
@@ -72,10 +75,10 @@ func (m *Manager) modelWizard(path string) error {
 		if name == "" {
 			return nil
 		}
-		if err := saveModelFile(path, mf); err != nil {
+		if err := models.SaveModelFile(path, mf); err != nil {
 			return err
 		}
-		fmt.Printf(T("Saved model config %q. Run `mas-launcher model` to manage models.\n"), name)
+		fmt.Printf(i18n.T("Saved model config %q. Run `mas-launcher model` to manage models.\n"), name)
 		return nil
 	}
 	return m.wizardFlowB(path, mf)
@@ -83,22 +86,22 @@ func (m *Manager) modelWizard(path string) error {
 
 // modelList prints the configured models.
 func (m *Manager) modelList(path string) error {
-	mf, err := loadModelFile(path)
+	mf, err := models.LoadModelFile(path)
 	if err != nil {
 		return err
 	}
 	if len(mf) == 0 {
-		fmt.Println(T("No model configs found in configs/models.yml."))
+		fmt.Println(i18n.T("No model configs found in configs/models.yml."))
 		return nil
 	}
-	for _, n := range modelNames(mf) {
+	for _, n := range models.ModelNames(mf) {
 		e := mf[n]
-		line := fmt.Sprintf(T("%-12s provider=%-9s model=%s"), n, e.getStr("provider"), e.getStr("model_name"))
-		if host := e.getStr("api_host"); host != "" {
+		line := fmt.Sprintf(i18n.T("%-12s provider=%-9s model=%s"), n, e.GetStr("provider"), e.GetStr("model_name"))
+		if host := e.GetStr("api_host"); host != "" {
 			line += "  api_host=" + host
 		}
-		if e.getBool("default") {
-			line += T("  (default)")
+		if e.GetBool("default") {
+			line += i18n.T("  (default)")
 		}
 		fmt.Println(line)
 	}
@@ -107,77 +110,77 @@ func (m *Manager) modelList(path string) error {
 
 // modelDelete removes a config non-interactively.
 func (m *Manager) modelDelete(path, name string, yes bool) error {
-	mf, err := loadModelFile(path)
+	mf, err := models.LoadModelFile(path)
 	if err != nil {
 		return err
 	}
 	if _, ok := mf[name]; !ok {
-		return fmt.Errorf(T("model config %q not found"), name)
+		return fmt.Errorf(i18n.T("model config %q not found"), name)
 	}
 	if !yes {
-		fmt.Printf(T("Type yes to delete %q: "), name)
+		fmt.Printf(i18n.T("Type yes to delete %q: "), name)
 		var answer string
 		if _, e := fmt.Scanln(&answer); e != nil {
 			return e
 		}
 		if strings.ToLower(answer) != "yes" {
-			return errors.New(T("cancelled"))
+			return errors.New(i18n.T("cancelled"))
 		}
 	}
-	wasDefault := mf[name].getBool("default")
+	wasDefault := mf[name].GetBool("default")
 	delete(mf, name)
 	if len(mf) == 0 {
-		if err := os.WriteFile(path, []byte(modelSeedComment), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(models.ModelSeedComment), 0o600); err != nil {
 			return err
 		}
-		fmt.Printf(T("Deleted %q. No model configs remain.\n"), name)
+		fmt.Printf(i18n.T("Deleted %q. No model configs remain.\n"), name)
 		return nil
 	}
-	newDefault := ensureDefault(mf)
-	if err := saveModelFile(path, mf); err != nil {
+	newDefault := models.EnsureDefault(mf)
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
-	fmt.Printf(T("Deleted %q.\n"), name)
+	fmt.Printf(i18n.T("Deleted %q.\n"), name)
 	if wasDefault && newDefault != "" {
-		fmt.Printf(T("Default is now %q.\n"), newDefault)
+		fmt.Printf(i18n.T("Default is now %q.\n"), newDefault)
 	}
 	return nil
 }
 
 // modelSetDefault marks a config as the default non-interactively.
 func (m *Manager) modelSetDefault(path, name string) error {
-	mf, err := loadModelFile(path)
+	mf, err := models.LoadModelFile(path)
 	if err != nil {
 		return err
 	}
 	if _, ok := mf[name]; !ok {
-		return fmt.Errorf(T("model config %q not found"), name)
+		return fmt.Errorf(i18n.T("model config %q not found"), name)
 	}
-	setDefault(mf, name)
-	if err := saveModelFile(path, mf); err != nil {
+	models.SetDefault(mf, name)
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
-	fmt.Printf(T("Default model is now %q.\n"), name)
+	fmt.Printf(i18n.T("Default model is now %q.\n"), name)
 	return nil
 }
 
 // modelWrite creates or overwrites a config non-interactively, sharing the
 // wizard's write path.
 func (m *Manager) modelWrite(path, cname, providerKey, modelName, apiKey, apiHost string, stream bool, temperature float64, maxTokens int, makeDefault bool) error {
-	mf, err := loadModelFile(path)
+	mf, err := models.LoadModelFile(path)
 	if err != nil {
 		return err
 	}
-	d := modelDraft{ModelName: modelName, APIKey: apiKey, Stream: stream}
+	d := models.ModelDraft{ModelName: modelName, APIKey: apiKey, Stream: stream}
 	if temperature != 0 {
 		d.Temperature = &temperature
 	}
 	if maxTokens != 0 {
 		d.MaxTokens = &maxTokens
 	}
-	if sp := findProvider(providerKey); sp != nil {
-		d.Provider = sp.provider
-		d.APIHost = sp.defaultHost
+	if sp := models.FindProvider(providerKey); sp != nil {
+		d.Provider = sp.Provider
+		d.APIHost = sp.DefaultHost
 		if apiHost != "" {
 			d.APIHost = apiHost
 		}
@@ -187,44 +190,44 @@ func (m *Manager) modelWrite(path, cname, providerKey, modelName, apiKey, apiHos
 	}
 	if existing, ok := mf[cname]; ok {
 		if d.APIHost == "" {
-			d.APIHost = existing.getStr("api_host")
+			d.APIHost = existing.GetStr("api_host")
 		}
 		mf[cname] = d.MergeInto(existing)
 	} else {
 		mf[cname] = d.ToEntry()
 	}
 	if makeDefault {
-		setDefault(mf, cname)
+		models.SetDefault(mf, cname)
 	}
-	ensureDefault(mf)
-	if err := saveModelFile(path, mf); err != nil {
+	models.EnsureDefault(mf)
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
-	fmt.Printf(T("Saved model config %q.\n"), cname)
+	fmt.Printf(i18n.T("Saved model config %q.\n"), cname)
 	return nil
 }
 
 // wizardFlowB is the CRUD menu shown when models.yml already has configs.
-func (m *Manager) wizardFlowB(path string, mf ModelFile) error {
+func (m *Manager) wizardFlowB(path string, mf models.ModelFile) error {
 	p := newPrompt()
 	for {
-		names := modelNames(mf)
+		names := models.ModelNames(mf)
 		if len(names) == 0 {
-			fmt.Println(T("No model configs remain. Run `mas-launcher model` to set one up."))
+			fmt.Println(i18n.T("No model configs remain. Run `mas-launcher model` to set one up."))
 			return nil
 		}
-		fmt.Println(T("Existing model configs:"))
+		fmt.Println(i18n.T("Existing model configs:"))
 		for i, n := range names {
 			def := ""
-			if mf[n].getBool("default") {
-				def = "  (default)"
+			if mf[n].GetBool("default") {
+				def = i18n.T("  (default)")
 			}
-			fmt.Printf("  %d) %-12s %-9s %s%s\n", i+1, n, mf[n].getStr("provider"), mf[n].getStr("model_name"), def)
+			fmt.Printf("  %d) %-12s %-9s %s%s\n", i+1, n, mf[n].GetStr("provider"), mf[n].GetStr("model_name"), def)
 		}
-		fmt.Println(T("  0) Create new model"))
-		fmt.Println(T("  d) Delete a model"))
-		fmt.Println(T("  s) Set default model"))
-		fmt.Println(T("  q) Back"))
+		fmt.Println(i18n.T("  0) Create new model"))
+		fmt.Println(i18n.T("  d) Delete a model"))
+		fmt.Println(i18n.T("  s) Set default model"))
+		fmt.Println(i18n.T("  q) Back"))
 		fmt.Print("> ")
 		line, err := p.r.ReadString('\n')
 		if err != nil {
@@ -249,7 +252,7 @@ func (m *Manager) wizardFlowB(path string, mf ModelFile) error {
 			if _, err := m.wizardCreate(p, mf); err != nil {
 				return err
 			}
-			if err := saveModelFile(path, mf); err != nil {
+			if err := models.SaveModelFile(path, mf); err != nil {
 				return err
 			}
 		default:
@@ -259,7 +262,7 @@ func (m *Manager) wizardFlowB(path string, mf ModelFile) error {
 					return err
 				}
 			} else {
-				fmt.Println(T("Invalid choice."))
+				fmt.Println(i18n.T("Invalid choice."))
 			}
 		}
 	}
@@ -267,7 +270,7 @@ func (m *Manager) wizardFlowB(path string, mf ModelFile) error {
 
 // wizardCreate walks provider -> model list -> params and writes the new
 // entry into mf. It returns the created config name ("" if cancelled).
-func (m *Manager) wizardCreate(p *prompt, mf ModelFile) (string, error) {
+func (m *Manager) wizardCreate(p *prompt, mf models.ModelFile) (string, error) {
 	d, err := m.wizardProviderAndModel(p)
 	if err != nil {
 		return "", err
@@ -276,17 +279,17 @@ func (m *Manager) wizardCreate(p *prompt, mf ModelFile) (string, error) {
 		return "", nil
 	}
 	for {
-		d.Name, err = p.ask(T("Config name (alias)"), defaultFromModelName(d.ModelName))
+		d.Name, err = p.ask(i18n.T("Config name (alias)"), models.DefaultFromModelName(d.ModelName))
 		if err != nil {
 			return "", err
 		}
 		d.Name = strings.TrimSpace(d.Name)
 		if d.Name == "" {
-			fmt.Println(T("Config name required."))
+			fmt.Println(i18n.T("Config name required."))
 			continue
 		}
 		if _, exists := mf[d.Name]; exists {
-			fmt.Printf(T("Config %q already exists.\n"), d.Name)
+			fmt.Printf(i18n.T("Config %q already exists.\n"), d.Name)
 			continue
 		}
 		break
@@ -294,98 +297,98 @@ func (m *Manager) wizardCreate(p *prompt, mf ModelFile) (string, error) {
 	if err := m.wizardParams(p, d); err != nil {
 		return "", err
 	}
-	if !hasAnyDefault(mf) {
+	if !models.HasAnyDefault(mf) {
 		d.Default = true
-		fmt.Println(T("This will be the default model."))
+		fmt.Println(i18n.T("This will be the default model."))
 	} else {
-		d.Default, err = p.askBool(T("Set as default model"), false)
+		d.Default, err = p.askBool(i18n.T("Set as default model"), false)
 		if err != nil {
 			return "", err
 		}
 	}
 	mf[d.Name] = d.ToEntry()
 	if d.Default {
-		setDefault(mf, d.Name)
+		models.SetDefault(mf, d.Name)
 	}
-	ensureDefault(mf)
+	models.EnsureDefault(mf)
 	return d.Name, nil
 }
 
 // wizardProviderAndModel guides provider selection, API key, and model
 // picking (from the fetched list, with a manual fallback).
-func (m *Manager) wizardProviderAndModel(p *prompt) (*modelDraft, error) {
-	keys := make([]string, 0, len(embeddedProviders)+1)
-	labels := make([]string, 0, len(embeddedProviders)+1)
-	for _, sp := range embeddedProviders {
-		keys = append(keys, sp.key)
-		labels = append(labels, T(sp.label))
+func (m *Manager) wizardProviderAndModel(p *prompt) (*models.ModelDraft, error) {
+	keys := make([]string, 0, len(models.EmbeddedProviders)+1)
+	labels := make([]string, 0, len(models.EmbeddedProviders)+1)
+	for _, sp := range models.EmbeddedProviders {
+		keys = append(keys, sp.Key)
+		labels = append(labels, i18n.T(sp.Label))
 	}
 	keys = append(keys, "custom")
-	labels = append(labels, T("Custom API host"))
+	labels = append(labels, i18n.T("Custom API host"))
 
-	idx, err := p.pickIndex(T("Select provider:"), labels, T("Manual entry / other"))
+	idx, err := p.pickIndex(i18n.T("Select provider:"), labels, i18n.T("Manual entry / other"))
 	if err != nil {
 		return nil, err
 	}
 	if idx == -1 {
 		return nil, nil
 	}
-	d := &modelDraft{}
-	var spec providerSpec
+	d := &models.ModelDraft{}
+	var spec models.ProviderSpec
 	switch {
 	case idx == 0:
-		prov, err := p.ask(T("Provider value (e.g. openai, azure)"), "")
+		prov, err := p.ask(i18n.T("Provider value (e.g. openai, azure)"), "")
 		if err != nil {
 			return nil, err
 		}
 		prov = strings.TrimSpace(prov)
 		if prov == "" {
-			return nil, errors.New(T("provider required"))
+			return nil, errors.New(i18n.T("provider required"))
 		}
-		host, err := p.ask(T("API host (optional)"), "")
+		host, err := p.ask(i18n.T("API host (optional)"), "")
 		if err != nil {
 			return nil, err
 		}
 		d.Provider = prov
 		d.APIHost = strings.TrimSpace(host)
-		spec = providerSpec{key: "manual", provider: prov, auth: "bearer"}
+		spec = models.ProviderSpec{Key: "manual", Provider: prov, Auth: "bearer"}
 	case idx == len(keys):
-		host, err := p.ask(T("API host (e.g. https://your-host/v1)"), "")
+		host, err := p.ask(i18n.T("API host (e.g. https://your-host/v1)"), "")
 		if err != nil {
 			return nil, err
 		}
 		host = strings.TrimSpace(host)
 		if host == "" {
-			return nil, errors.New(T("API host required for a custom provider"))
+			return nil, errors.New(i18n.T("API host required for a custom provider"))
 		}
 		d.Provider = "Openai"
 		d.APIHost = host
-		spec = providerSpec{key: "custom", provider: "Openai", auth: "bearer"}
+		spec = models.ProviderSpec{Key: "custom", Provider: "Openai", Auth: "bearer"}
 	default:
-		spec = embeddedProviders[idx-1]
-		d.Provider = spec.provider
-		d.APIHost = spec.defaultHost
+		spec = models.EmbeddedProviders[idx-1]
+		d.Provider = spec.Provider
+		d.APIHost = spec.DefaultHost
 	}
-	if spec.key != "ollama" {
-		key, err := p.ask(T("API key"), "")
+	if spec.Key != "ollama" {
+		key, err := p.ask(i18n.T("API key"), "")
 		if err != nil {
 			return nil, err
 		}
 		d.APIKey = strings.TrimSpace(key)
 		if d.APIKey != "" {
-			fmt.Println(T("Note: api_key is stored in plaintext in configs/models.yml."))
+			fmt.Println(i18n.T("Note: api_key is stored in plaintext in configs/models.yml."))
 		}
 	}
-	models, err := fetchModelList(spec, d.APIHost, d.APIKey)
+	models, err := models.FetchModelList(spec, d.APIHost, d.APIKey)
 	if err != nil || len(models) == 0 {
-		fmt.Printf(T("Could not fetch model list: %v\n"), err)
-		mid, err := p.ask(T("Model id"), "")
+		fmt.Printf(i18n.T("Could not fetch model list: %v\n"), err)
+		mid, err := p.ask(i18n.T("Model id"), "")
 		if err != nil {
 			return nil, err
 		}
 		d.ModelName = strings.TrimSpace(mid)
 	} else {
-		idx, err := p.pickIndex(T("Select model:"), models, T("Enter model id manually"))
+		idx, err := p.pickIndex(i18n.T("Select model:"), models, i18n.T("Enter model id manually"))
 		if err != nil {
 			return nil, err
 		}
@@ -393,7 +396,7 @@ func (m *Manager) wizardProviderAndModel(p *prompt) (*modelDraft, error) {
 			return nil, nil
 		}
 		if idx == 0 {
-			mid, err := p.ask(T("Model id"), "")
+			mid, err := p.ask(i18n.T("Model id"), "")
 			if err != nil {
 				return nil, err
 			}
@@ -403,15 +406,15 @@ func (m *Manager) wizardProviderAndModel(p *prompt) (*modelDraft, error) {
 		}
 	}
 	if strings.TrimSpace(d.ModelName) == "" {
-		return nil, errors.New(T("model name required"))
+		return nil, errors.New(i18n.T("model name required"))
 	}
 	return d, nil
 }
 
 // wizardParams collects the generation params, with an optional advanced
 // section gated behind a prompt.
-func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
-	stream, err := p.askBool(T("Enable streaming"), d.Stream)
+func (m *Manager) wizardParams(p *prompt, d *models.ModelDraft) error {
+	stream, err := p.askBool(i18n.T("Enable streaming"), d.Stream)
 	if err != nil {
 		return err
 	}
@@ -421,7 +424,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.Temperature != nil {
 		t = *d.Temperature
 	}
-	t, err = p.askFloat(T("Temperature"), t)
+	t, err = p.askFloat(i18n.T("Temperature"), t)
 	if err != nil {
 		return err
 	}
@@ -431,7 +434,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.MaxTokens != nil {
 		mt = *d.MaxTokens
 	}
-	mt, err = p.askInt(T("Max tokens"), mt)
+	mt, err = p.askInt(i18n.T("Max tokens"), mt)
 	if err != nil {
 		return err
 	}
@@ -441,13 +444,13 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.TopP != nil {
 		tp = *d.TopP
 	}
-	tp, err = p.askFloat(T("Top P"), tp)
+	tp, err = p.askFloat(i18n.T("Top P"), tp)
 	if err != nil {
 		return err
 	}
 	d.TopP = &tp
 
-	adv, err := p.askBool(T("Configure advanced params"), false)
+	adv, err := p.askBool(i18n.T("Configure advanced params"), false)
 	if err != nil {
 		return err
 	}
@@ -455,13 +458,13 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 		return nil
 	}
 
-	mm, err := p.askBool(T("Multimodal"), d.Multimodal)
+	mm, err := p.askBool(i18n.T("Multimodal"), d.Multimodal)
 	if err != nil {
 		return err
 	}
 	d.Multimodal = mm
 
-	osr, err := p.askBool(T("Online search"), d.OnlineSearch)
+	osr, err := p.askBool(i18n.T("Online search"), d.OnlineSearch)
 	if err != nil {
 		return err
 	}
@@ -471,7 +474,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.EnableThinking != nil {
 		et = *d.EnableThinking
 	}
-	et, err = p.askBool(T("Enable thinking"), et)
+	et, err = p.askBool(i18n.T("Enable thinking"), et)
 	if err != nil {
 		return err
 	}
@@ -481,7 +484,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.ThinkingBudget != nil {
 		tb = *d.ThinkingBudget
 	}
-	tb, err = p.askInt(T("Thinking budget"), tb)
+	tb, err = p.askInt(i18n.T("Thinking budget"), tb)
 	if err != nil {
 		return err
 	}
@@ -493,7 +496,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 	if d.TopK != nil {
 		tk = *d.TopK
 	}
-	tk, err = p.askFloat(T("Top K"), tk)
+	tk, err = p.askFloat(i18n.T("Top K"), tk)
 	if err != nil {
 		return err
 	}
@@ -501,7 +504,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 		d.TopK = &tk
 	}
 
-	eb, err := p.ask(T("extra_body (JSON, e.g. {\"thinking\":{\"type\":\"enabled\"}})"), d.ExtraBody)
+	eb, err := p.ask(i18n.T("extra_body (JSON, e.g. {\"thinking\":{\"type\":\"enabled\"}})"), d.ExtraBody)
 	if err != nil {
 		return err
 	}
@@ -521,7 +524,7 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 		if *cfg.ptr != nil {
 			cur = **cfg.ptr
 		}
-		v, err := p.askFloat(T(cfg.label), cur)
+		v, err := p.askFloat(i18n.T(cfg.label), cur)
 		if err != nil {
 			return err
 		}
@@ -534,12 +537,12 @@ func (m *Manager) wizardParams(p *prompt, d *modelDraft) error {
 
 // wizardModify edits an existing config, pre-filling values and preserving
 // unknown/legacy keys via MergeInto.
-func (m *Manager) wizardModify(p *prompt, path string, mf ModelFile, name string) error {
+func (m *Manager) wizardModify(p *prompt, path string, mf models.ModelFile, name string) error {
 	existing := mf[name]
 	d := existing.ToDraft()
 	d.Name = name
-	fmt.Printf(T("Editing %q (%s / %s).\n"), name, d.Provider, d.ModelName)
-	chg, err := p.askBool(T("Change provider or model"), false)
+	fmt.Printf(i18n.T("Editing %q (%s / %s).\n"), name, d.Provider, d.ModelName)
+	chg, err := p.askBool(i18n.T("Change provider or model"), false)
 	if err != nil {
 		return err
 	}
@@ -554,14 +557,14 @@ func (m *Manager) wizardModify(p *prompt, path string, mf ModelFile, name string
 		d.Provider, d.ModelName, d.APIKey, d.APIHost = nd.Provider, nd.ModelName, nd.APIKey, nd.APIHost
 	}
 	cur := maskKey(d.APIKey)
-	nk, err := p.ask(T("API key"), cur)
+	nk, err := p.ask(i18n.T("API key"), cur)
 	if err != nil {
 		return err
 	}
 	if nk != cur {
 		d.APIKey = nk
 	}
-	nn, err := p.ask(T("Config name"), d.Name)
+	nn, err := p.ask(i18n.T("Config name"), d.Name)
 	if err != nil {
 		return err
 	}
@@ -571,15 +574,15 @@ func (m *Manager) wizardModify(p *prompt, path string, mf ModelFile, name string
 	}
 	if nn != d.Name {
 		if _, exists := mf[nn]; exists {
-			return fmt.Errorf(T("config %q already exists"), nn)
+			return fmt.Errorf(i18n.T("config %q already exists"), nn)
 		}
-		fmt.Printf(T("Renamed %q to %q.\n"), d.Name, nn)
+		fmt.Printf(i18n.T("Renamed %q to %q.\n"), d.Name, nn)
 	}
 	if err := m.wizardParams(p, &d); err != nil {
 		return err
 	}
 	wasDefault := d.Default
-	isDefault, err := p.askBool(T("Set as default model"), wasDefault)
+	isDefault, err := p.askBool(i18n.T("Set as default model"), wasDefault)
 	if err != nil {
 		return err
 	}
@@ -593,12 +596,12 @@ func (m *Manager) wizardModify(p *prompt, path string, mf ModelFile, name string
 	}
 	mf[nn] = entry
 	if d.Default {
-		setDefault(mf, nn)
+		models.SetDefault(mf, nn)
 	} else if wasDefault {
 		delete(entry, "default")
 	}
-	ensureDefault(mf)
-	if err := saveModelFile(path, mf); err != nil {
+	models.EnsureDefault(mf)
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
 	fmt.Printf("Saved model config %q.\n", nn)
@@ -606,9 +609,9 @@ func (m *Manager) wizardModify(p *prompt, path string, mf ModelFile, name string
 }
 
 // wizardDelete removes a config after a confirmation prompt.
-func (m *Manager) wizardDelete(p *prompt, path string, mf ModelFile) error {
-	names := modelNames(mf)
-	idx, err := p.pickIndex(T("Select a model to delete:"), names, T("Cancel"))
+func (m *Manager) wizardDelete(p *prompt, path string, mf models.ModelFile) error {
+	names := models.ModelNames(mf)
+	idx, err := p.pickIndex(i18n.T("Select a model to delete:"), names, i18n.T("Cancel"))
 	if err != nil {
 		return err
 	}
@@ -616,47 +619,47 @@ func (m *Manager) wizardDelete(p *prompt, path string, mf ModelFile) error {
 		return nil
 	}
 	name := names[idx-1]
-	fmt.Printf(T("Type yes to delete %q: "), name)
+	fmt.Printf(i18n.T("Type yes to delete %q: "), name)
 	ans, err := p.r.ReadString('\n')
 	if err != nil {
 		return err
 	}
 	if strings.ToLower(strings.TrimSpace(ans)) != "yes" {
-		fmt.Println(T("cancelled"))
+		fmt.Println(i18n.T("cancelled"))
 		return nil
 	}
-	wasDefault := mf[name].getBool("default")
+	wasDefault := mf[name].GetBool("default")
 	delete(mf, name)
 	if len(mf) == 0 {
-		if err := os.WriteFile(path, []byte(modelSeedComment), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(models.ModelSeedComment), 0o600); err != nil {
 			return err
 		}
-		fmt.Printf(T("Deleted %q. No model configs remain.\n"), name)
+		fmt.Printf(i18n.T("Deleted %q. No model configs remain.\n"), name)
 		return nil
 	}
-	newDefault := ensureDefault(mf)
-	if err := saveModelFile(path, mf); err != nil {
+	newDefault := models.EnsureDefault(mf)
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
-	fmt.Printf(T("Deleted %q.\n"), name)
+	fmt.Printf(i18n.T("Deleted %q.\n"), name)
 	if wasDefault && newDefault != "" {
-		fmt.Printf(T("Default is now %q.\n"), newDefault)
+		fmt.Printf(i18n.T("Default is now %q.\n"), newDefault)
 	}
 	return nil
 }
 
 // wizardSetDefault picks the default config interactively.
-func (m *Manager) wizardSetDefault(p *prompt, path string, mf ModelFile) error {
-	names := modelNames(mf)
-	idx, err := p.pickIndex(T("Select the default model:"), names, T("Cancel"))
+func (m *Manager) wizardSetDefault(p *prompt, path string, mf models.ModelFile) error {
+	names := models.ModelNames(mf)
+	idx, err := p.pickIndex(i18n.T("Select the default model:"), names, i18n.T("Cancel"))
 	if err != nil {
 		return err
 	}
 	if idx == -1 || idx == 0 {
 		return nil
 	}
-	setDefault(mf, names[idx-1])
-	if err := saveModelFile(path, mf); err != nil {
+	models.SetDefault(mf, names[idx-1])
+	if err := models.SaveModelFile(path, mf); err != nil {
 		return err
 	}
 	fmt.Printf("Default model is now %q.\n", names[idx-1])
@@ -743,7 +746,7 @@ func (p *prompt) pickIndex(label string, items []string, zeroLabel string) (int,
 		fmt.Printf("  %d) %s\n", i+1, it)
 	}
 	fmt.Printf("  0) %s\n", zeroLabel)
-	fmt.Println(T("  q) quit/back"))
+	fmt.Println(i18n.T("  q) quit/back"))
 	for {
 		fmt.Print("> ")
 		s, err := p.r.ReadString('\n')

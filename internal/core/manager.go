@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/MuikaAI/mas-launcher/internal/i18n"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 )
 
 var version = "dev"
-var errNotRunning = errors.New(T("instance is not running"))
+var errNotRunning = errors.New(i18n.T("instance is not running"))
 
 type Config struct {
 	SchemaVersion int                 `json:"schema_version"`
@@ -56,14 +57,7 @@ type Manager struct {
 	Config Config
 }
 
-func main() {
-	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
-}
-
-func run(args []string) error {
+func Run(args []string) error {
 	if len(args) > 0 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
 		usage()
 		return nil
@@ -110,12 +104,12 @@ func run(args []string) error {
 	case "remove":
 		return m.removeCmd(args[1:])
 	default:
-		return fmt.Errorf(T("unknown command %q; run mas-launcher help"), args[0])
+		return fmt.Errorf(i18n.T("unknown command %q; run mas-launcher help"), args[0])
 	}
 }
 
 func usage() {
-	fmt.Println(T(`Muika-After-Story launcher
+	fmt.Println(i18n.T(`Muika-After-Story launcher
 
   mas-launcher                                      bootstrap default instance (init/configure/model/start)
   mas-launcher init [name]                         clone and prepare an instance
@@ -199,7 +193,7 @@ func instanceName(args []string) (string, []string) {
 func (m *Manager) instance(name string) (Instance, string, error) {
 	i, ok := m.Config.Instances[name]
 	if !ok {
-		return Instance{}, "", fmt.Errorf(T("instance %q does not exist; run init first"), name)
+		return Instance{}, "", fmt.Errorf(i18n.T("instance %q does not exist; run init first"), name)
 	}
 	return i, filepath.Join(i.Path, "repo"), nil
 }
@@ -255,4 +249,3 @@ func waitSignal() context.Context {
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	return ctx
 }
-func _unusedIO() { _, _ = io.Copy(io.Discard, strings.NewReader("")) }

@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"net/http"
@@ -24,27 +24,27 @@ func TestYAMLRoundTripPreservesUnknownFields(t *testing.T) {
 			"unknown_key": "legacy-value",
 		},
 	}
-	if err := saveModelFile(path, mf); err != nil {
+	if err := SaveModelFile(path, mf); err != nil {
 		t.Fatal(err)
 	}
-	got, err := loadModelFile(path)
+	got, err := LoadModelFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	e := got["deepseek"]
-	if e.getStr("provider") != "Openai" || e.getStr("model_name") != "deepseek-chat" {
+	if e.GetStr("provider") != "Openai" || e.GetStr("model_name") != "deepseek-chat" {
 		t.Errorf("core fields lost: %#v", e)
 	}
-	if !e.getBool("default") {
+	if !e.GetBool("default") {
 		t.Error("default lost")
 	}
-	if e.getInt("think") != 2 {
+	if e.GetInt("think") != 2 {
 		t.Errorf("unknown int field lost: %#v", e["think"])
 	}
-	if e.getStr("unknown_key") != "legacy-value" {
+	if e.GetStr("unknown_key") != "legacy-value" {
 		t.Errorf("unknown string field lost: %#v", e["unknown_key"])
 	}
-	if e.getFloat("input_price") != 3.0 {
+	if e.GetFloat("input_price") != 3.0 {
 		t.Errorf("price lost: %#v", e["input_price"])
 	}
 	if _, ok := e["extra_body"]; !ok {
@@ -62,7 +62,7 @@ func TestOpenaiModelURLs(t *testing.T) {
 		{"https://api.openai.com/v1/", []string{"https://api.openai.com/v1/models"}},
 	}
 	for _, c := range cases {
-		got := openaiModelURLs(c.host)
+		got := OpenaiModelURLs(c.host)
 		if len(got) != len(c.want) {
 			t.Fatalf("%s: got %v want %v", c.host, got, c.want)
 		}
@@ -79,19 +79,19 @@ func TestSetDefaultAndEnsure(t *testing.T) {
 		"a": ModelEntry{"default": true},
 		"b": ModelEntry{},
 	}
-	setDefault(mf, "b")
-	if mf["a"].getBool("default") || !mf["b"].getBool("default") {
-		t.Fatal("setDefault did not move default")
+	SetDefault(mf, "b")
+	if mf["a"].GetBool("default") || !mf["b"].GetBool("default") {
+		t.Fatal("SetDefault did not move default")
 	}
 	delete(mf, "b")
-	if def := ensureDefault(mf); def != "a" {
-		t.Fatalf("ensureDefault after delete = %q want a", def)
+	if def := EnsureDefault(mf); def != "a" {
+		t.Fatalf("EnsureDefault after delete = %q want a", def)
 	}
 	mf2 := ModelFile{"z": ModelEntry{}, "a": ModelEntry{}}
-	if def := ensureDefault(mf2); def != "a" {
-		t.Fatalf("ensureDefault fresh = %q want a", def)
+	if def := EnsureDefault(mf2); def != "a" {
+		t.Fatalf("EnsureDefault fresh = %q want a", def)
 	}
-	if !mf2["a"].getBool("default") {
+	if !mf2["a"].GetBool("default") {
 		t.Fatal("default not auto-assigned")
 	}
 }
@@ -106,7 +106,7 @@ func TestDefaultFromModelName(t *testing.T) {
 		"llama3:8b":        "llama3",
 	}
 	for in, want := range cases {
-		if got := defaultFromModelName(in); got != want {
+		if got := DefaultFromModelName(in); got != want {
 			t.Errorf("%q -> %q want %q", in, got, want)
 		}
 	}
@@ -114,15 +114,15 @@ func TestDefaultFromModelName(t *testing.T) {
 
 func TestMergeIntoPreservesUnknown(t *testing.T) {
 	existing := ModelEntry{"think": 2, "provider": "Openai", "model_name": "deepseek-chat"}
-	d := modelDraft{Provider: "Openai", ModelName: "deepseek-v4", Default: true}
+	d := ModelDraft{Provider: "Openai", ModelName: "deepseek-v4", Default: true}
 	got := d.MergeInto(existing)
-	if got.getInt("think") != 2 {
+	if got.GetInt("think") != 2 {
 		t.Error("unknown field lost on merge")
 	}
-	if got.getStr("model_name") != "deepseek-v4" {
+	if got.GetStr("model_name") != "deepseek-v4" {
 		t.Error("known field not updated")
 	}
-	if !got.getBool("default") {
+	if !got.GetBool("default") {
 		t.Error("default not set")
 	}
 }
@@ -143,8 +143,8 @@ func TestFetchModelListOpenAICompatible(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	spec := providerSpec{provider: "Openai", auth: "bearer"}
-	got, err := fetchModelList(spec, srv.URL, "sk-test")
+	spec := ProviderSpec{Provider: "Openai", Auth: "bearer"}
+	got, err := FetchModelList(spec, srv.URL, "sk-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,8 +167,8 @@ func TestFetchModelListGemini(t *testing.T) {
 	}))
 	defer gem.Close()
 
-	spec := providerSpec{provider: "Gemini", listBase: gem.URL + "/v1beta/models", auth: "query"}
-	got, err := fetchModelList(spec, "", "gem-key")
+	spec := ProviderSpec{Provider: "Gemini", ListBase: gem.URL + "/v1beta/models", Auth: "query"}
+	got, err := FetchModelList(spec, "", "gem-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,14 +178,14 @@ func TestFetchModelListGemini(t *testing.T) {
 }
 
 func TestEmbeddedProvidersMapToAppModules(t *testing.T) {
-	dir := filepath.Join("..", "muika", "llm", "providers")
+	dir := filepath.Join("..", "..", "muika", "llm", "providers")
 	if _, err := os.Stat(dir); err != nil {
 		t.Skip("app provider dir not present in this checkout")
 	}
-	for _, sp := range embeddedProviders {
-		name := strings.ToLower(sp.provider)
+	for _, sp := range EmbeddedProviders {
+		name := strings.ToLower(sp.Provider)
 		if _, err := os.Stat(filepath.Join(dir, name+".py")); err != nil {
-			t.Errorf("provider %q writes %q which has no muika/llm/providers/%s.py", sp.key, sp.provider, name)
+			t.Errorf("provider %q writes %q which has no muika/llm/providers/%s.py", sp.Key, sp.Provider, name)
 		}
 	}
 }

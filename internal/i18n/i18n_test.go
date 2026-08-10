@@ -1,7 +1,8 @@
-package main
+package i18n
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,42 +96,46 @@ var (
 )
 
 // TestCatalogCompleteness ensures every T("...") / T(`...`) literal call site
-// has a matching zhMessages entry, so a mistyped key can never silently stay
-// English instead of raising an error.
+// in the packages that use the catalog has a matching zhMessages entry, so a
+// mistyped key can never silently stay English instead of raising an error.
+// It scans the sibling caller packages (the core command layer plus the
+// models and repository packages, which localize their own errors).
 func TestCatalogCompleteness(t *testing.T) {
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
 	checked := 0
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || name == "i18n.go" || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		b, err := os.ReadFile(name)
+	for _, dir := range []string{"../core", "../models", "../repository"} {
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
-		src := string(b)
-		for _, m := range quotedKeyRe.FindAllStringSubmatch(src, -1) {
-			key, err := strconv.Unquote(`"` + m[1] + `"`)
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			b, err := os.ReadFile(filepath.Join(dir, name))
 			if err != nil {
-				t.Fatalf("%s: cannot unquote %q: %v", name, m[1], err)
+				t.Fatal(err)
 			}
-			checked++
-			if _, ok := zhMessages[key]; !ok {
-				t.Errorf("%s: missing catalog entry for key %q", name, key)
+			src := string(b)
+			for _, m := range quotedKeyRe.FindAllStringSubmatch(src, -1) {
+				key, err := strconv.Unquote(`"` + m[1] + `"`)
+				if err != nil {
+					t.Fatalf("%s: cannot unquote %q: %v", name, m[1], err)
+				}
+				checked++
+				if _, ok := zhMessages[key]; !ok {
+					t.Errorf("%s: missing catalog entry for key %q", filepath.Join(dir, name), key)
+				}
 			}
-		}
-		for _, m := range rawKeyRe.FindAllStringSubmatch(src, -1) {
-			key, err := strconv.Unquote("`" + m[1] + "`")
-			if err != nil {
-				t.Fatalf("%s: cannot unquote raw key: %v", name, err)
-			}
-			checked++
-			if _, ok := zhMessages[key]; !ok {
-				t.Errorf("%s: missing catalog entry for raw key", name)
+			for _, m := range rawKeyRe.FindAllStringSubmatch(src, -1) {
+				key, err := strconv.Unquote("`" + m[1] + "`")
+				if err != nil {
+					t.Fatalf("%s: cannot unquote raw key: %v", name, err)
+				}
+				checked++
+				if _, ok := zhMessages[key]; !ok {
+					t.Errorf("%s: missing catalog entry for raw key", filepath.Join(dir, name))
+				}
 			}
 		}
 	}

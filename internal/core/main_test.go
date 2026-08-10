@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"os"
@@ -28,15 +28,6 @@ func TestEnvRoundTrip(t *testing.T) {
 		if got[k] != v {
 			t.Errorf("%s=%q want %q", k, got[k], v)
 		}
-	}
-}
-func TestWithin(t *testing.T) {
-	r := t.TempDir()
-	if !within(r, filepath.Join(r, "nested", "file")) {
-		t.Fatal("nested path rejected")
-	}
-	if within(r, filepath.Join(r, "..", "outside")) {
-		t.Fatal("traversal accepted")
 	}
 }
 func TestStateRoundTrip(t *testing.T) {

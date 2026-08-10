@@ -45,7 +45,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -trimpath -ldflags "-s -w -X main.version=${{ github.event.release.tag_name || github.ref_name }}" -o mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+        run: go build -trimpath -ldflags "-s -w -X github.com/MuikaAI/mas-launcher/internal/core.version=${{ github.event.release.tag_name || github.ref_name }}" -o mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/mas-launcher
       - name: Checksum
         run: sha256sum mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} > mas-launcher-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.sha256
       - uses: actions/upload-artifact@v4
