@@ -52,7 +52,7 @@ func loadAgreementContent(repo string) (AgreementContent, error) {
 		return c, err
 	}
 	if c.Title == "" || c.Text == "" || c.Updated == "" {
-		return c, errors.New("agreement file has empty title/text/updated")
+		return c, errors.New(T("agreement file has empty title/text/updated"))
 	}
 	return c, nil
 }
@@ -130,7 +130,7 @@ func sign(repo string, content AgreementContent) error {
 // confirmAgreement asks the user to accept the license. EOF (non-interactive
 // stdin) counts as a decline.
 func confirmAgreement(p *prompt) (bool, error) {
-	fmt.Print("同意吗？(是/否): ")
+	fmt.Print(T("Agree? (yes/no): "))
 	ans, err := p.r.ReadString('\n')
 	if err != nil {
 		if err == io.EOF {
@@ -152,19 +152,19 @@ func (m *Manager) promptAndSign(repo string, content AgreementContent) error {
 	time.Sleep(time.Second)
 	fmt.Println(content.Text)
 	time.Sleep(5 * time.Second)
-	fmt.Printf("以上条款更新于: %s。您必须同意以上条款和阅读许可证声明后才可继续使用 MAS\n", content.Updated)
+	fmt.Printf(T("The terms were updated on %s. You must agree to the terms and read the license declaration before continuing to use MAS\n"), content.Updated)
 
 	ok, err := confirmAgreement(newPrompt())
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return errors.New("您未同意协议，MAS 无法继续运行")
+		return errors.New(T("You did not agree to the agreement; MAS cannot continue running"))
 	}
 	if err := sign(repo, content); err != nil {
 		return err
 	}
-	fmt.Println("感谢您的同意，MAS 将开始运行")
+	fmt.Println(T("Thank you for agreeing. MAS will now start running"))
 	return nil
 }
 
@@ -172,12 +172,12 @@ func (m *Manager) promptAndSign(repo string, content AgreementContent) error {
 func (m *Manager) checkAndSign(repo string) error {
 	content, err := loadAgreementContent(repo)
 	if err != nil {
-		return fmt.Errorf("cannot read %s: %w — run 'mas-launcher update' to fetch it", agreementContentPath(repo), err)
+		return fmt.Errorf(T("cannot read %s: %w — run 'mas-launcher update' to fetch it"), agreementContentPath(repo), err)
 	}
 	path := agreementStatePath(repo)
 	st, err := loadAgreementState(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: corrupt agreement state %s (%v); will re-prompt\n", path, err)
+		fmt.Fprintf(os.Stderr, T("warning: corrupt agreement state %s (%v); will re-prompt\n"), path, err)
 		st = AgreementState{}
 	}
 	if !needsSign(st.HasAgreed, st.Version, content.Updated) {
@@ -209,14 +209,14 @@ func (m *Manager) licenseCmd(args []string) error {
 	}
 	if !needsSign(st.HasAgreed, st.Version, content.Updated) {
 		if *status {
-			fmt.Printf("License accepted (version %s, signed %s).\n", st.Version, st.Timestamp)
+			fmt.Printf(T("License accepted (version %s, signed %s).\n"), st.Version, st.Timestamp)
 		} else {
-			fmt.Printf("License already accepted (version %s).\n", st.Version)
+			fmt.Printf(T("License already accepted (version %s).\n"), st.Version)
 		}
 		return nil
 	}
 	if *status {
-		fmt.Printf("License NOT accepted (need version %s).\n", content.Updated)
+		fmt.Printf(T("License NOT accepted (need version %s).\n"), content.Updated)
 		return nil
 	}
 	return m.promptAndSign(repo, content)

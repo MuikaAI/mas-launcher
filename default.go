@@ -42,7 +42,7 @@ func (m *Manager) envStatus(repo string) ([]string, error) {
 func (m *Manager) defaultCmd(args []string) error {
 	const name = "default"
 	if _, ok := m.Config.Instances[name]; !ok {
-		fmt.Println("No default instance found; creating one...")
+		fmt.Println(T("No default instance found; creating one..."))
 		if err := m.initCmd(nil); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (m *Manager) defaultCmd(args []string) error {
 		return err
 	}
 	if s, e := m.readState(name); e == nil && (processAlive(s.CorePID) || processAlive(s.BotPID)) {
-		fmt.Println("Instance already running.")
+		fmt.Println(T("Instance already running."))
 		return nil
 	}
 	missing, err := m.envStatus(repo)
@@ -65,10 +65,10 @@ func (m *Manager) defaultCmd(args []string) error {
 	}
 	for _, id := range envCheckIDs {
 		if !need[id] {
-			fmt.Printf("  ok: %s\n", id)
+			fmt.Printf(T("  ok: %s\n"), T(id))
 			continue
 		}
-		fmt.Printf("  %s missing; fixing...\n", id)
+		fmt.Printf(T("  %s missing; fixing...\n"), T(id))
 		var e error
 		switch id {
 		case "python":
@@ -85,7 +85,7 @@ func (m *Manager) defaultCmd(args []string) error {
 		}
 	}
 	if rest, e := m.envStatus(repo); e == nil && len(rest) > 0 {
-		fmt.Printf("Warning: still missing: %v\n", rest)
+		fmt.Printf(T("Warning: still missing: %v\n"), rest)
 	}
 	return m.startCmd(nil)
 }

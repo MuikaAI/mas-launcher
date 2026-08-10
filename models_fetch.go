@@ -55,7 +55,7 @@ func fetchModelList(spec providerSpec, host, apiKey string) ([]string, error) {
 	}
 	if len(out) == 0 {
 		if lastErr == nil {
-			lastErr = fmt.Errorf("empty model list from %s", host)
+			lastErr = fmt.Errorf(T("empty model list from %s"), host)
 		}
 		return nil, lastErr
 	}
@@ -99,7 +99,7 @@ func fetchOneModelList(client *http.Client, spec providerSpec, u, apiKey string)
 		} `json:"models"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("%s: invalid JSON: %w", u, err)
+		return nil, fmt.Errorf(T("%s: invalid JSON: %w"), u, err)
 	}
 	var ids []string
 	for _, m := range payload.Data {

@@ -26,7 +26,7 @@ const (
 )
 
 var version = "dev"
-var errNotRunning = errors.New("instance is not running")
+var errNotRunning = errors.New(T("instance is not running"))
 
 type Config struct {
 	SchemaVersion int                 `json:"schema_version"`
@@ -110,12 +110,12 @@ func run(args []string) error {
 	case "remove":
 		return m.removeCmd(args[1:])
 	default:
-		return fmt.Errorf("unknown command %q; run mas-launcher help", args[0])
+		return fmt.Errorf(T("unknown command %q; run mas-launcher help"), args[0])
 	}
 }
 
 func usage() {
-	fmt.Println(`Muika-After-Story launcher
+	fmt.Println(T(`Muika-After-Story launcher
 
   mas-launcher                                      bootstrap default instance (init/configure/model/start)
   mas-launcher init [name]                         clone and prepare an instance
@@ -129,7 +129,7 @@ func usage() {
   mas-launcher logs [name] [--service core|bot]    view logs
   mas-launcher update [name] [--ref REF]           update the checkout
   mas-launcher doctor [name]                       diagnose environment
-  mas-launcher remove [name]                       remove an instance`)
+  mas-launcher remove [name]                       remove an instance`))
 }
 
 func newManager() (*Manager, error) {
@@ -199,7 +199,7 @@ func instanceName(args []string) (string, []string) {
 func (m *Manager) instance(name string) (Instance, string, error) {
 	i, ok := m.Config.Instances[name]
 	if !ok {
-		return Instance{}, "", fmt.Errorf("instance %q does not exist; run init first", name)
+		return Instance{}, "", fmt.Errorf(T("instance %q does not exist; run init first"), name)
 	}
 	return i, filepath.Join(i.Path, "repo"), nil
 }

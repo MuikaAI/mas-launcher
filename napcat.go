@@ -62,8 +62,8 @@ func (m *Manager) napcatCmd(args []string) error {
 	case "darwin":
 		return napcatMacOS()
 	default:
-		fmt.Println("NapCat Shell mode is not supported on this platform.")
-		fmt.Println("Docker deployment: see deploy/README.md")
+		fmt.Println(T("NapCat Shell mode is not supported on this platform."))
+		fmt.Println(T("Docker deployment: see deploy/README.md"))
 		return nil
 	}
 }
@@ -73,14 +73,14 @@ func (m *Manager) napcatCmd(args []string) error {
 // details. Called from startCmd after Core + Bot are up, and from napcatCmd.
 func napcatConfigInfo(repo string, i Instance) {
 	env := parseEnv(filepath.Join(repo, ".env"))
-	fmt.Println("─ Onebot V11 (reverse WebSocket) ─")
-	fmt.Printf("  Listen:   ws://%s:8080/onebot/v11/\n", i.Host)
-	fmt.Println("  The protocol implementation (e.g. NapCat) connects here as a WebSocket client.")
+	fmt.Println(T("─ Onebot V11 (reverse WebSocket) ─"))
+	fmt.Printf(T("  Listen:   ws://%s:8080/onebot/v11/\n"), i.Host)
+	fmt.Println(T("  The protocol implementation (e.g. NapCat) connects here as a WebSocket client."))
 	fmt.Println()
-	fmt.Println("─ Core ─")
-	fmt.Printf("  WebSocket:   ws://%s:%d/ws\n", i.Host, i.Port)
+	fmt.Println(T("─ Core ─"))
+	fmt.Printf(T("  WebSocket:   ws://%s:%d/ws\n"), i.Host, i.Port)
 	if s := env["IPC_SECRET"]; s != "" {
-		fmt.Printf("  IPC Secret:  %s\n", s)
+		fmt.Printf(T("  IPC Secret:  %s\n"), s)
 	}
 	fmt.Println("─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─")
 }
@@ -97,7 +97,7 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		defaultDir = filepath.Join(instancePath, "napcat")
 	}
 	p := newPrompt()
-	dir, err := p.ask("NapCat directory", defaultDir)
+	dir, err := p.ask(T("NapCat directory"), defaultDir)
 	if err != nil {
 		return "", "", err
 	}
@@ -111,22 +111,22 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		}
 	}
 	if needDownload {
-		dl, err := p.askBool("Download NapCat.Shell.zip to this directory", true)
+		dl, err := p.askBool(T("Download NapCat.Shell.zip to this directory"), true)
 		if err != nil {
 			return "", "", err
 		}
 		if dl {
 			if err := downloadNapCat(dir); err != nil {
-				fmt.Printf("Download failed: %v\n", err)
-				fmt.Println("Download manually from https://github.com/NapNeko/NapCatQQ/releases")
+				fmt.Printf(T("Download failed: %v\n"), err)
+				fmt.Println(T("Download manually from https://github.com/NapNeko/NapCatQQ/releases"))
 			}
 		} else {
-			fmt.Println("Download NapCat.Shell.zip from https://github.com/NapNeko/NapCatQQ/releases")
-			fmt.Println("and extract it to:", dir)
+			fmt.Println(T("Download NapCat.Shell.zip from https://github.com/NapNeko/NapCatQQ/releases"))
+			fmt.Printf(T("and extract it to: %s\n"), dir)
 		}
 	}
 
-	qq, err = p.ask("QQ number (optional, or leave empty to scan QR in WebUI)", defaultQQ)
+	qq, err = p.ask(T("QQ number (optional, or leave empty to scan QR in WebUI)"), defaultQQ)
 	if err != nil {
 		return "", "", err
 	}
@@ -147,8 +147,8 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		}
 	}
 	if _, err := os.Stat(bat); err != nil {
-		fmt.Println("launcher script not found in", dir)
-		fmt.Println("Make sure NapCat.Shell is extracted and try again.")
+		fmt.Printf(T("launcher script not found in: %s\n"), dir)
+		fmt.Println(T("Make sure NapCat.Shell is extracted and try again."))
 		return dir, qq, nil
 	}
 
@@ -156,7 +156,7 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 	// connects back to the bot without manual configuration.
 	if qq != "" {
 		if err := configureOnebot(dir, qq); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not auto-configure Onebot: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("warning: could not auto-configure Onebot: %v\n"), err)
 		}
 	}
 
@@ -173,9 +173,9 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		c.Dir = dir
 		hideWindow(c)
 		if err := c.Start(); err != nil {
-			return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
+			return dir, qq, fmt.Errorf(T("failed to start NapCat: %w"), err)
 		}
-		fmt.Printf("NapCat started in background (PID %d).\n", c.Process.Pid)
+		fmt.Printf(T("NapCat started in background (PID %d).\n"), c.Process.Pid)
 	} else {
 		startArgs := []string{"/c", "start", "", bat}
 		if qq != "" {
@@ -184,7 +184,7 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 		c = exec.Command("cmd", startArgs...)
 		c.Dir = dir
 		if err := c.Run(); err != nil {
-			return dir, qq, fmt.Errorf("failed to start NapCat: %w", err)
+			return dir, qq, fmt.Errorf(T("failed to start NapCat: %w"), err)
 		}
 	}
 
@@ -192,11 +192,11 @@ func napcatWindows(instancePath, defaultDir, defaultQQ string, showWindow, admin
 	// with the token from webui.json.
 	time.Sleep(2 * time.Second)
 	if tokenURL := readWebUIToken(dir); tokenURL != "" {
-		fmt.Println("NapCat WebUI:", tokenURL)
+		fmt.Printf(T("NapCat WebUI: %s\n"), tokenURL)
 	} else {
-		fmt.Println("NapCat WebUI: http://127.0.0.1:6099/webui (token will appear after first launch)")
+		fmt.Println(T("NapCat WebUI: http://127.0.0.1:6099/webui (token will appear after first launch)"))
 	}
-	fmt.Println("Open the WebUI to scan QR and log in.")
+	fmt.Println(T("Open the WebUI to scan QR and log in."))
 	return dir, qq, nil
 }
 
@@ -268,20 +268,20 @@ func readWebUIToken(dir string) string {
 
 // napcatLinux prints the one-click installer command for Linux.
 func napcatLinux() error {
-	fmt.Println("Run the NapCat installer (requires sudo):")
-	fmt.Println()
-	fmt.Println("  curl -o napcat.sh https://nclatest.znin.net/NapNeko/NapCat-Installer/main/script/install.sh && sudo bash napcat.sh")
-	fmt.Println()
-	fmt.Println("Advanced options: --tui  --docker [y/n]  --cli [y/n]  --proxy [0-6]  --force")
-	fmt.Println("Docker deployment: see deploy/README.md")
+	fmt.Println(T(`Run the NapCat installer (requires sudo):
+
+  curl -o napcat.sh https://nclatest.znin.net/NapNeko/NapCat-Installer/main/script/install.sh && sudo bash napcat.sh
+
+Advanced options: --tui  --docker [y/n]  --cli [y/n]  --proxy [0-6]  --force
+Docker deployment: see deploy/README.md`))
 	return nil
 }
 
 // napcatMacOS tells the user to self-install.
 func napcatMacOS() error {
-	fmt.Println("NapCat Shell mode is not available on macOS.")
-	fmt.Println("Refer to https://napneko.pages.dev or use Docker:")
-	fmt.Println("  deploy/README.md")
+	fmt.Println(T(`NapCat Shell mode is not available on macOS.
+Refer to https://napneko.pages.dev or use Docker:
+  deploy/README.md`))
 	return nil
 }
 
@@ -289,7 +289,7 @@ func napcatMacOS() error {
 // the given napcat directory. Returns nil if no such process exists.
 func stopNapCat(dir string) error {
 	if dir == "" {
-		return errors.New("no napcat directory configured; run mas-launcher napcat first")
+		return errors.New(T("no napcat directory configured; run mas-launcher napcat first"))
 	}
 	pid, err := findNapCatPID(dir)
 	if err != nil {
@@ -298,7 +298,7 @@ func stopNapCat(dir string) error {
 	if err := killPID(pid); err != nil {
 		return err
 	}
-	fmt.Printf("NapCat stopped (PID %d).\n", pid)
+	fmt.Printf(T("NapCat stopped (PID %d).\n"), pid)
 	return nil
 }
 
@@ -309,7 +309,7 @@ func findNapCatPID(dir string) (int, error) {
 	// truncation issue like Get-Process has with 17-char names).
 	out, err := exec.Command("tasklist", "/fi", "IMAGENAME eq NapCatWinBootMain.exe", "/fo", "csv", "/nh").Output()
 	if err != nil {
-		return 0, fmt.Errorf("cannot enumerate NapCat processes: %w", err)
+		return 0, fmt.Errorf(T("cannot enumerate NapCat processes: %w"), err)
 	}
 	var pids []int
 	for _, line := range strings.Split(string(out), "\n") {
@@ -348,16 +348,16 @@ func findNapCatPID(dir string) (int, error) {
 		return pids[0], nil
 	}
 	if len(pids) > 1 {
-		return 0, fmt.Errorf("multiple NapCat processes found (%v); stop manually", pids)
+		return 0, fmt.Errorf(T("multiple NapCat processes found (%v); stop manually"), pids)
 	}
-	return 0, errors.New("napcat process not found (is it running?)")
+	return 0, errors.New(T("napcat process not found (is it running?)"))
 }
 
 func parseInt(s string) (int, error) {
 	var n int
 	for _, c := range s {
 		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("not a number: %q", s)
+			return 0, fmt.Errorf(T("not a number: %q"), s)
 		}
 		n = n*10 + int(c-'0')
 	}
@@ -379,7 +379,7 @@ func downloadNapCat(dir string) error {
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
 
-	fmt.Println("Downloading", url, "...")
+	fmt.Printf(T("Downloading %s...\n"), url)
 	resp, err := http.Get(url)
 	if err != nil {
 		tmp.Close()
@@ -388,7 +388,7 @@ func downloadNapCat(dir string) error {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		tmp.Close()
-		return fmt.Errorf("download failed: %s", resp.Status)
+		return fmt.Errorf(T("download failed: %s"), resp.Status)
 	}
 	if _, err := io.Copy(tmp, resp.Body); err != nil {
 		tmp.Close()
@@ -396,7 +396,7 @@ func downloadNapCat(dir string) error {
 	}
 	tmp.Close()
 
-	fmt.Println("Extracting...")
+	fmt.Println(T("Extracting..."))
 	return extractZip(tmpName, dir)
 }
 
@@ -420,7 +420,7 @@ func napCatShellURL() (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned %s", resp.Status)
+		return "", fmt.Errorf(T("GitHub API returned %s"), resp.Status)
 	}
 	var rel struct {
 		Assets []struct {
@@ -429,14 +429,14 @@ func napCatShellURL() (string, error) {
 		} `json:"assets"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return "", fmt.Errorf("failed to parse GitHub release: %w", err)
+		return "", fmt.Errorf(T("failed to parse GitHub release: %w"), err)
 	}
 	for _, a := range rel.Assets {
 		if strings.EqualFold(a.Name, "NapCat.Shell.zip") {
 			return a.BrowserDownloadURL, nil
 		}
 	}
-	return "", errors.New("NapCat.Shell.zip not found in latest release")
+	return "", errors.New(T("NapCat.Shell.zip not found in latest release"))
 }
 
 // extractZip unzips src into dst, flattening a single top-level directory

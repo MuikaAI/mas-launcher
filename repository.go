@@ -26,11 +26,11 @@ func fetchRepository(repo, ref, dest string) error {
 		}
 	}
 	if !strings.HasPrefix(repo, "https://github.com/") {
-		return errors.New("cannot fetch repository; use a GitHub URL or install Git")
+		return errors.New(T("cannot fetch repository; use a GitHub URL or install Git"))
 	}
 	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(repo, "https://github.com/"), ".git"), "/")
 	if len(parts) < 2 {
-		return errors.New("cannot fetch repository; use a GitHub URL or install Git")
+		return errors.New(T("cannot fetch repository; use a GitHub URL or install Git"))
 	}
 	url := fmt.Sprintf("https://github.com/%s/%s/archive/refs/heads/%s.zip", parts[0], parts[1], ref)
 	return downloadZip(url, dest)
@@ -42,7 +42,7 @@ func downloadZip(url, dest string) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf("repository download failed: %s", r.Status)
+		return fmt.Errorf(T("repository download failed: %s"), r.Status)
 	}
 	tmp, err := os.CreateTemp("", "mas-launcher-*.zip")
 	if err != nil {
@@ -63,7 +63,7 @@ func downloadZip(url, dest string) error {
 	}
 	defer z.Close()
 	if len(z.File) == 0 {
-		return errors.New("empty repository archive")
+		return errors.New(T("empty repository archive"))
 	}
 	prefix := strings.Split(filepath.ToSlash(z.File[0].Name), "/")[0] + "/"
 	for _, f := range z.File {
@@ -77,7 +77,7 @@ func downloadZip(url, dest string) error {
 		}
 		target := filepath.Join(dest, filepath.FromSlash(rel))
 		if !within(dest, target) {
-			return errors.New("archive contains an invalid path")
+			return errors.New(T("archive contains an invalid path"))
 		}
 		if strings.HasSuffix(n, "/") {
 			if err := os.MkdirAll(target, 0o700); err != nil {

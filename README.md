@@ -65,6 +65,10 @@ mas-launcher remove [name]                       remove an instance
 
 可用环境变量 `MUIKA_HOME` 覆盖。
 
+## 语言
+
+启动器界面默认按 `MUIKA_LANG` > `LC_ALL` > `LANG` > 系统 UI 语言的优先级自动选择中英文。设置 `MUIKA_LANG=zh` 强制中文，`MUIKA_LANG=en` 强制英文（英文为内置回退语言）。
+
 ## 环境要求
 
 - **Go ≥ 1.22**（仅构建时）
