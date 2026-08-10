@@ -64,7 +64,7 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+	if len(args) > 0 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
 		usage()
 		return nil
 	}
@@ -75,6 +75,9 @@ func run(args []string) error {
 	m, err := newManager()
 	if err != nil {
 		return err
+	}
+	if len(args) == 0 {
+		return m.defaultCmd(nil)
 	}
 	switch args[0] {
 	case "init":
@@ -114,6 +117,7 @@ func run(args []string) error {
 func usage() {
 	fmt.Println(`Muika-After-Story launcher
 
+  mas-launcher                                      bootstrap default instance (init/configure/model/start)
   mas-launcher init [name]                         clone and prepare an instance
   mas-launcher configure [name]                    configure .env and model
   mas-launcher model [name]                        configure models.yml (wizard or CRUD)

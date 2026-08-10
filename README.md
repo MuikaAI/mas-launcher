@@ -12,6 +12,7 @@ go build -trimpath -ldflags "-s -w -X main.version=dev" -o mas-launcher .
 ## 快速开始
 
 ```bash
+mas-launcher                          # 无参数：自动 初始化 → 配置 → 选模型 → 启动 default 实例
 mas-launcher init                     # 创建默认实例（克隆主项目 + 准备 Python 环境）
 mas-launcher configure                # 配置 .env（Master ID、IPC 密钥、WebSocket 地址）
 mas-launcher model                    # 配置 models.yml（选 provider → 拉模型列表 → 选模型）
@@ -23,6 +24,7 @@ mas-launcher start                    # 首次启动会先展示许可协议，�
 ## 命令
 
 ```
+mas-launcher                                       bootstrap default instance (init/configure/model/start)
 mas-launcher init [name]                         clone and prepare an instance
 mas-launcher configure [name]                    configure .env and model
 mas-launcher model [name]                        configure models.yml (wizard or CRUD)
@@ -38,6 +40,7 @@ mas-launcher remove [name]                       remove an instance
 
 ### 常用命令说明
 
+- **`（无参数）`** — 对 `default` 实例自动引导：实例不存在则先 `init`；依次检查 Python 环境、`.env`、`MASTER_ID`、`models.yml` 默认模型，缺失项自动修复或进入对应向导；若已在运行则提示后退出，否则调用 `start` 启动 Core 与 Bot。`help` / `--help` / `-h` 仍打印帮助，`version` / `--version` 仍打印版本。
 - **`init [name]`** — 创建并准备一个实例（默认名 `default`）：拉取主项目、初始化 `.env`、创建 Python venv。
 - **`configure [name]`** — 交互设置 `.env`（Master ID、IPC_SECRET、CORE_WS_URL）。模型配置请改用 `model` 命令。
 - **`model [name]`** — 配置 `configs/models.yml` 的向导：内嵌 openai / kimi / glm / deepseek / dashscope / gemini / ollama 或自定义 `api_host`，从 provider 拉取模型列表供选择，再配置 api_key 与采样参数；已有配置时进入 新建/修改/删除 菜单。也支持脚本化参数：`--list`、`--delete NAME --yes`、`--set-default NAME`，以及 `--name ... --provider ... --model ... --api-key ...` 直接写入。
