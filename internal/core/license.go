@@ -1,12 +1,14 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -15,13 +17,13 @@ import (
 )
 
 const (
-	agreementContentFile = "user_agreement.json" // inside <repo>/configs/
+	agreementContentFile = "user_agreement.json"
 	agreementStateFile   = "user_agreement.json" // inside the instance data dir
 	isoDateLayout        = "2006-01-02"
 	isoStampLayout       = "2006-01-02T15:04:05" // no tz -> Python fromisoformat-compatible
 )
 
-// AgreementContent mirrors configs/user_agreement.json.
+// AgreementContent contains the text and version shown to the user.
 type AgreementContent struct {
 	Title   string `json:"title"`
 	Text    string `json:"text"`
@@ -38,6 +40,10 @@ type AgreementState struct {
 
 // agreementContentPath returns the shared agreement file path in a checkout.
 func agreementContentPath(repo string) string {
+	bundled := filepath.Join(repo, "muika", agreementContentFile)
+	if _, err := os.Stat(bundled); !os.IsNotExist(err) {
+		return bundled
+	}
 	return filepath.Join(repo, "configs", agreementContentFile)
 }
 
@@ -59,11 +65,14 @@ func loadAgreementContent(repo string) (AgreementContent, error) {
 	return c, nil
 }
 
-// agreementStateDir resolves the instance data dir from MUIKA_DATA_DIR in
+// agreementStateDir resolves the instance data dir from DATA_DIR in
 // the instance .env (default "data"), joined to the repo when relative.
 func agreementStateDir(repo string) string {
 	dir := "data"
-	if v := parseEnv(filepath.Join(repo, ".env"))["MUIKA_DATA_DIR"]; v != "" {
+	if v := parseEnv(filepath.Join(repo, ".env"))["DATA_DIR"]; v != "" {
+		dir = v
+	}
+	if v, ok := os.LookupEnv("DATA_DIR"); ok {
 		dir = v
 	}
 	if !filepath.IsAbs(dir) {
@@ -147,15 +156,69 @@ func confirmAgreement(p *prompt) (bool, error) {
 	return false, nil
 }
 
-// promptAndSign prints the agreement (mirroring the Python UX) and signs on
-// acceptance. Declining returns an error so the caller aborts the start.
-func (m *Manager) promptAndSign(repo string, content AgreementContent) error {
-	fmt.Println(content.Title)
-	time.Sleep(time.Second)
-	fmt.Println(content.Text)
-	time.Sleep(5 * time.Second)
-	fmt.Printf(i18n.T("The terms were updated on %s. You must agree to the terms and read the license declaration before continuing to use MAS\n"), content.Updated)
+// AgreementStatus contains the instance's agreement decision.
+type AgreementStatus struct {
+	Content         AgreementContent `json:"content"`
+	State           AgreementState   `json:"state"`
+	StateError      string           `json:"state_error"`
+	NeedsAcceptance *bool            `json:"needs_acceptance"`
+	shared          bool
+}
 
+// agreementCommand keeps protocol output separate from diagnostic messages.
+func agreementCommand(repo string, args ...string) ([]byte, error) {
+	cmd := exec.Command(python(repo), args...)
+	cmd.Dir = repo
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("agreement command failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return output, nil
+}
+
+// readAgreementStatus uses Python when available. Only an absent bridge permits
+// legacy handling; a broken bridge must report its error.
+func readAgreementStatus(repo string) (AgreementStatus, error) {
+	const probe = "import importlib.util, runpy, sys; sys.exit(42) if importlib.util.find_spec('muika.agreement') is None else None; sys.argv = ['muika.agreement', 'status']; runpy.run_module('muika.agreement', run_name='__main__')"
+	output, err := agreementCommand(repo, "-c", probe)
+	if err == nil {
+		var status AgreementStatus
+		if err := json.Unmarshal(output, &status); err != nil {
+			return status, fmt.Errorf("invalid agreement response: %w", err)
+		}
+		if status.NeedsAcceptance == nil || status.Content.Title == "" || status.Content.Text == "" || status.Content.Updated == "" {
+			return status, errors.New("incomplete agreement response")
+		}
+		status.shared = true
+		return status, nil
+	}
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitCode() != 42 {
+		return AgreementStatus{}, err
+	}
+	content, err := loadAgreementContent(repo)
+	if err != nil {
+		return AgreementStatus{}, err
+	}
+	path := agreementStatePath(repo)
+	state, err := loadAgreementState(path)
+	stateError := ""
+	if err != nil {
+		stateError = fmt.Sprintf("Cannot read agreement state %s: %v", path, err)
+		state = AgreementState{}
+	}
+	needsAcceptance := needsSign(state.HasAgreed, state.Version, content.Updated)
+	return AgreementStatus{Content: content, State: state, StateError: stateError, NeedsAcceptance: &needsAcceptance}, nil
+}
+
+// promptAndSign displays the version that the user explicitly accepts.
+func (m *Manager) promptAndSign(repo string, status AgreementStatus) error {
+	content := status.Content
+	fmt.Println(content.Title)
+	fmt.Println(content.Text)
+	fmt.Printf(i18n.T("The terms were updated on %s. You must agree to the terms and read the license declaration before continuing to use MAS\n"), content.Updated)
 	ok, err := confirmAgreement(newPrompt())
 	if err != nil {
 		return err
@@ -163,7 +226,12 @@ func (m *Manager) promptAndSign(repo string, content AgreementContent) error {
 	if !ok {
 		return errors.New(i18n.T("You did not agree to the agreement; MAS cannot continue running"))
 	}
-	if err := sign(repo, content); err != nil {
+	if status.shared {
+		_, err = agreementCommand(repo, "-m", "muika.agreement", "accept", "--version", content.Updated)
+	} else {
+		err = sign(repo, content)
+	}
+	if err != nil {
 		return err
 	}
 	fmt.Println(i18n.T("Thank you for agreeing. MAS will now start running"))
@@ -172,20 +240,17 @@ func (m *Manager) promptAndSign(repo string, content AgreementContent) error {
 
 // checkAndSign ensures the license is signed before the instance starts.
 func (m *Manager) checkAndSign(repo string) error {
-	content, err := loadAgreementContent(repo)
+	status, err := readAgreementStatus(repo)
 	if err != nil {
-		return fmt.Errorf(i18n.T("cannot read %s: %w — run 'mas-launcher update' to fetch it"), agreementContentPath(repo), err)
+		return err
 	}
-	path := agreementStatePath(repo)
-	st, err := loadAgreementState(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, i18n.T("warning: corrupt agreement state %s (%v); will re-prompt\n"), path, err)
-		st = AgreementState{}
+	if status.StateError != "" {
+		fmt.Fprintln(os.Stderr, status.StateError)
 	}
-	if !needsSign(st.HasAgreed, st.Version, content.Updated) {
+	if !*status.NeedsAcceptance {
 		return nil
 	}
-	return m.promptAndSign(repo, content)
+	return m.promptAndSign(repo, status)
 }
 
 // licenseCmd implements `mas-launcher license [name] [--status]`.
@@ -201,25 +266,24 @@ func (m *Manager) licenseCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	content, err := loadAgreementContent(repo)
+	result, err := readAgreementStatus(repo)
 	if err != nil {
 		return err
 	}
-	st, err := loadAgreementState(agreementStatePath(repo))
-	if err != nil {
-		st = AgreementState{}
+	if result.StateError != "" {
+		fmt.Fprintln(os.Stderr, result.StateError)
 	}
-	if !needsSign(st.HasAgreed, st.Version, content.Updated) {
+	if !*result.NeedsAcceptance {
 		if *status {
-			fmt.Printf(i18n.T("License accepted (version %s, signed %s).\n"), st.Version, st.Timestamp)
+			fmt.Printf(i18n.T("License accepted (version %s, signed %s).\n"), result.State.Version, result.State.Timestamp)
 		} else {
-			fmt.Printf(i18n.T("License already accepted (version %s).\n"), st.Version)
+			fmt.Printf(i18n.T("License already accepted (version %s).\n"), result.State.Version)
 		}
 		return nil
 	}
 	if *status {
-		fmt.Printf(i18n.T("License NOT accepted (need version %s).\n"), content.Updated)
+		fmt.Printf(i18n.T("License NOT accepted (need version %s).\n"), result.Content.Updated)
 		return nil
 	}
-	return m.promptAndSign(repo, content)
+	return m.promptAndSign(repo, result)
 }

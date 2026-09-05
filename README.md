@@ -53,6 +53,19 @@ mas-launcher remove [name]                       remove an instance
 - **`doctor [name]`** — 诊断环境（项目文件、Python、`.env` 是否就绪）。
 - **`remove [name]`** — 删除实例（需输入 `yes` 确认）。
 
+## 用户协议兼容
+
+启动器使用实例 Python 的 `muika.agreement` 接口查询正文、判断版本和保存确认记录。
+`license --status` 只读取状态；`license` 和 `start` 在需要确认时展示条款。
+拒绝或终端输入结束会中止启动。接口执行失败会报告错误，不会改用旧正文掩盖故障。
+
+旧 MAS 没有该接口时，启动器先读取 `muika/user_agreement.json`，文件不存在才读取 `configs/user_agreement.json`。
+同意记录位于 `DATA_DIR/user_agreement.json`，默认 `./data/user_agreement.json`。
+`DATA_DIR` 环境变量优先于实例 `.env`；相对路径以实例目录为基准。
+
+发布顺序：先发布并更新此启动器，再发布移除旧正文路径的 MAS。
+已有版本 `2026-02-01` 的有效同意记录可继续使用。
+
 ## 数据位置
 
 实例、日志、配置保存在平台用户数据目录：

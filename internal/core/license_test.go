@@ -35,18 +35,18 @@ func TestNeedsSign(t *testing.T) {
 func TestAgreementStateDirResolution(t *testing.T) {
 	repo := t.TempDir()
 	if got := agreementStateDir(repo); got != filepath.Join(repo, "data") {
-		t.Errorf("absent MUIKA_DATA_DIR: got %q want %q", got, filepath.Join(repo, "data"))
+		t.Errorf("absent DATA_DIR: got %q want %q", got, filepath.Join(repo, "data"))
 	}
-	writeEnv(filepath.Join(repo, ".env"), map[string]string{"MUIKA_DATA_DIR": "./data"})
+	writeEnv(filepath.Join(repo, ".env"), map[string]string{"DATA_DIR": "./data"})
 	if got := agreementStateDir(repo); got != filepath.Join(repo, "data") {
 		t.Errorf("./data: got %q", got)
 	}
-	writeEnv(filepath.Join(repo, ".env"), map[string]string{"MUIKA_DATA_DIR": "data"})
+	writeEnv(filepath.Join(repo, ".env"), map[string]string{"DATA_DIR": "data"})
 	if got := agreementStateDir(repo); got != filepath.Join(repo, "data") {
 		t.Errorf("data: got %q", got)
 	}
 	abs := t.TempDir()
-	writeEnv(filepath.Join(repo, ".env"), map[string]string{"MUIKA_DATA_DIR": abs})
+	writeEnv(filepath.Join(repo, ".env"), map[string]string{"DATA_DIR": abs})
 	if got := agreementStateDir(repo); got != abs {
 		t.Errorf("absolute: got %q want %q", got, abs)
 	}
@@ -87,7 +87,7 @@ func TestAgreementContentMissingErrors(t *testing.T) {
 
 func TestAgreementStateRoundTrip(t *testing.T) {
 	repo := t.TempDir()
-	writeEnv(filepath.Join(repo, ".env"), map[string]string{"MUIKA_DATA_DIR": "./data"})
+	writeEnv(filepath.Join(repo, ".env"), map[string]string{"DATA_DIR": "./data"})
 	content := AgreementContent{Title: "T", Text: "X", Updated: "2026-02-01"}
 	if err := sign(repo, content); err != nil {
 		t.Fatal(err)
@@ -144,5 +144,29 @@ func TestConfirmAgreement(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%q: got %v want %v", c.in, got, c.want)
 		}
+	}
+}
+
+func TestAgreementPrefersBundledContentWithoutHidingErrors(t *testing.T) {
+	repo := t.TempDir()
+	for _, directory := range []string{"configs", "muika"} {
+		path := filepath.Join(repo, directory, agreementContentFile)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		content := `{"title":"` + directory + `","text":"text","updated":"2026-02-01"}`
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	content, err := loadAgreementContent(repo)
+	if err != nil || content.Title != "muika" {
+		t.Fatalf("content=%+v error=%v", content, err)
+	}
+	if err := os.WriteFile(agreementContentPath(repo), []byte("broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadAgreementContent(repo); err == nil {
+		t.Fatal("corrupt bundled content must not use legacy content")
 	}
 }
