@@ -337,7 +337,7 @@ func (m *Manager) wizardProviderAndModel(p *prompt) (*models.ModelDraft, error) 
 	var spec models.ProviderSpec
 	switch {
 	case idx == 0:
-		prov, err := p.ask(i18n.T("Provider value (e.g. openai, azure)"), "")
+		prov, err := p.ask(i18n.T("Provider value (e.g. openai, gemini)"), "")
 		if err != nil {
 			return nil, err
 		}

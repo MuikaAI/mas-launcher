@@ -137,7 +137,7 @@ var zhMessages = map[string]string{
 	"Custom API host":                                                     "自定义 API 地址",
 	"Select provider:":                                                    "选择服务商：",
 	"Manual entry / other":                                                "手动输入 / 其他",
-	"Provider value (e.g. openai, azure)":                                 "服务商值（例如 openai、azure）",
+	"Provider value (e.g. openai, gemini)":                                "服务商值（例如 openai、gemini）",
 	"API host (optional)":                                                 "API 地址（可选）",
 	"API host (e.g. https://your-host/v1)":                                "API 地址（例如 https://your-host/v1）",
 	"API key":                                                             "API 密钥",
