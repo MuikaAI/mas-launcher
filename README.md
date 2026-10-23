@@ -29,6 +29,7 @@ mas-launcher init [name]                         clone and prepare an instance
 mas-launcher configure [name]                    configure .env and model
 mas-launcher model [name]                        configure models.yml (wizard or CRUD)
 mas-launcher license [name] [--status]           view/sign the license agreement
+mas-launcher napcat [name] [--show-napcat] [--admin] [--stop] configure QQ access (NapCat)
 mas-launcher start [name] [--foreground]         start Core and Bot
 mas-launcher stop|restart [name]                 manage processes
 mas-launcher status [name] [--json]              inspect state
@@ -45,6 +46,7 @@ mas-launcher remove [name]                       remove an instance
 - **`configure [name]`** — 交互设置 `.env`（Master ID、IPC_SECRET、CORE_WS_URL）。模型配置请改用 `model` 命令。
 - **`model [name]`** — 配置 `configs/models.yml` 的向导：内嵌 openai / kimi / glm / deepseek / dashscope / gemini / ollama 或自定义 `api_host`，从 provider 拉取模型列表供选择，再配置 api_key 与采样参数；已有配置时进入 新建/修改/删除 菜单。也支持脚本化参数：`--list`、`--delete NAME --yes`、`--set-default NAME`，以及 `--name ... --provider ... --model ... --api-key ...` 直接写入。
 - **`license [name]`** — 查看 / 签署许可协议（`--status` 仅打印状态）。`start` 前会自动检查：未签署或版本过旧时在启动器终端内展示条款等待同意，拒绝则中止启动。
+- **`napcat [name] [--show-napcat] [--admin] [--stop]`** — 配置 QQ 接入（NapCat）：Windows 下从 NapCat 官方 Releases 下载 `NapCat.Shell.zip` 并解压到实例目录，写入 OneBot v11 反向 WebSocket 配置并启动；`--stop` 停止已启动的 NapCat，`--show-napcat` 显示终端窗口，`--admin` 以管理员权限启动。
 - **`start [name] [--foreground]`** — 后台启动 Core 与 Bot；`--foreground` 前台运行，`--no-bot` 只启动 Core。
 - **`stop` / `restart [name]`** — 停止 / 重启实例。
 - **`status [name] [--json]`** — 查看进程状态。
@@ -86,3 +88,11 @@ mas-launcher remove [name]                       remove an instance
 
 - **Go ≥ 1.22**（仅构建时）
 - 运行实例时：**Python ≥ 3.10**（或 uv）、**Git**（克隆与更新实例用）
+
+## 第三方组件
+
+启动器的 QQ 接入使用 [NapCat](https://github.com/NapNeko/NapCatQQ)（NapCat.Shell），由 NapNeko 开发维护。本项目与 NapNeko 无隶属关系；启动器不修改 NapCat 程序，也不随发布物分发其包体。
+
+`mas-launcher napcat` 在用户确认后，从 NapCat 官方 GitHub Releases 下载 `NapCat.Shell.zip` 并解压到本地实例目录（Windows 向导）；Linux 提示使用官方安装脚本，macOS 不提供 Shell 模式。Docker 部署使用官方镜像 `mlikiowa/napcat-docker`。
+
+NapCat 采用 [Limited Redistribution License](https://github.com/NapNeko/NapCatQQ/blob/main/LICENSE)（Copyright © 2024 Mlikoowa）：未经其作者明确许可，禁止使用、复制、修改或分发该代码；再分发须附完整许可文本，并清楚标明来源与版权信息；不得用于商业用途。使用 NapCat 前请阅读并遵守该许可。
