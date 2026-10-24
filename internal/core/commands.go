@@ -403,6 +403,15 @@ func (m *Manager) doctorCmd(args []string) error {
 			fmt.Printf(i18n.T("%s: missing\n"), i18n.T(check.label))
 		}
 	}
+	if problems, e := modelConfigProblems(repo); e != nil {
+		fmt.Printf(i18n.T("models: invalid: %v\n"), e)
+	} else if len(problems) == 0 {
+		fmt.Println(i18n.T("models: ok"))
+	} else {
+		for _, problem := range problems {
+			fmt.Printf(i18n.T("models: %s\n"), problem)
+		}
+	}
 	return nil
 }
 func (m *Manager) removeCmd(args []string) error {

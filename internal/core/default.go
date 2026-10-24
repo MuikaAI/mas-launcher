@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/MuikaAI/mas-launcher/internal/i18n"
 	"github.com/MuikaAI/mas-launcher/internal/models"
@@ -37,6 +38,32 @@ func (m *Manager) envStatus(repo string) ([]string, error) {
 		missing = append(missing, "model")
 	}
 	return missing, nil
+}
+
+// modelConfigProblems reports configs/models.yml entries this instance cannot load.
+func modelConfigProblems(repo string) ([]string, error) {
+	mf, err := models.LoadModelFile(models.ModelsPath(repo))
+	if err != nil {
+		return nil, err
+	}
+	if len(mf) == 0 {
+		return []string{i18n.T("no model configured")}, nil
+	}
+	var problems []string
+	if !models.HasAnyDefault(mf) {
+		problems = append(problems, i18n.T("no default model"))
+	}
+	for _, name := range models.ModelNames(mf) {
+		provider := strings.ToLower(mf[name].GetStr("provider"))
+		if provider == "" {
+			problems = append(problems, fmt.Sprintf(i18n.T("model %q: provider is empty"), name))
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(repo, "muika", "llm", "providers", provider+".py")); err != nil {
+			problems = append(problems, fmt.Sprintf(i18n.T("model %q: provider %q is missing from this instance"), name, provider))
+		}
+	}
+	return problems, nil
 }
 
 // defaultCmd implements the no-argument bootstrap: it brings the default

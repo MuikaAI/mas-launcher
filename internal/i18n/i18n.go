@@ -236,6 +236,15 @@ Refer to https://napneko.pages.dev or use Docker:
 	// models_fetch.go
 	"empty model list from %s": "%s 返回的模型列表为空",
 	"%s: invalid JSON: %w":     "%s：无效 JSON：%w",
+
+	// doctor
+	"models: ok":                  "模型配置：正常",
+	"models: invalid: %v\n":       "模型配置：无效：%v\n",
+	"models: %s\n":                "模型配置：%s\n",
+	"no model configured":         "尚未配置模型",
+	"no default model":            "没有默认模型",
+	"model %q: provider is empty": "模型 %q：未填写 provider",
+	"model %q: provider %q is missing from this instance": "模型 %q：provider %q 在当前实例中不存在",
 }
 
 // T returns the translation of key in the current language, falling back to
