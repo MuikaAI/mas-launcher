@@ -127,6 +127,19 @@ func TestMergeIntoPreservesUnknown(t *testing.T) {
 	}
 }
 
+func TestContextWindowRoundTrip(t *testing.T) {
+	window := 32768
+	d := ModelDraft{Provider: "Openai", ContextWindow: &window}
+	e := d.ToEntry()
+	if got := e.GetInt("context_window"); got != window {
+		t.Fatalf("context_window = %d want %d", got, window)
+	}
+	back := e.ToDraft()
+	if back.ContextWindow == nil || *back.ContextWindow != window {
+		t.Fatalf("round trip lost context_window: %#v", back.ContextWindow)
+	}
+}
+
 func TestFetchModelListOpenAICompatible(t *testing.T) {
 	var gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

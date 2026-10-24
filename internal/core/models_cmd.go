@@ -440,6 +440,19 @@ func (m *Manager) wizardParams(p *prompt, d *models.ModelDraft) error {
 	}
 	d.MaxTokens = &mt
 
+	cw := 131072
+	if d.ContextWindow != nil {
+		cw = *d.ContextWindow
+	}
+	cw, err = p.askInt(i18n.T("Context window (tokens)"), cw)
+	if err != nil {
+		return err
+	}
+	if cw < 1024 {
+		return errors.New(i18n.T("Context window must be at least 1024 tokens"))
+	}
+	d.ContextWindow = &cw
+
 	tp := 0.95
 	if d.TopP != nil {
 		tp = *d.TopP

@@ -169,6 +169,7 @@ type ModelDraft struct {
 	Temperature    *float64
 	TopP           *float64
 	MaxTokens      *int
+	ContextWindow  *int
 	ExtraBody      string
 	InputPrice     *float64
 	OutputPrice    *float64
@@ -214,6 +215,9 @@ func (d ModelDraft) ToEntry() ModelEntry {
 	}
 	if d.MaxTokens != nil {
 		e["max_tokens"] = *d.MaxTokens
+	}
+	if d.ContextWindow != nil {
+		e["context_window"] = *d.ContextWindow
 	}
 	if d.ExtraBody != "" {
 		var v any
@@ -263,6 +267,7 @@ func (e ModelEntry) ToDraft() ModelDraft {
 	d.Temperature = floatPtr(e, "temperature")
 	d.TopP = floatPtr(e, "top_p")
 	d.MaxTokens = intPtr(e, "max_tokens")
+	d.ContextWindow = intPtr(e, "context_window")
 	d.InputPrice = floatPtr(e, "input_price")
 	d.OutputPrice = floatPtr(e, "output_price")
 	d.CachedPrice = floatPtr(e, "cached_price")
