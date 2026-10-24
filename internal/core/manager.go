@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -214,7 +215,16 @@ func commandContext(ctx context.Context, dir, program string, args ...string) er
 	c.Dir, c.Stdout, c.Stderr = dir, os.Stdout, os.Stderr
 	return c.Run()
 }
-func randomPort() int { return defaultPort }
+
+// randomPort returns a currently free local port for a new instance.
+func randomPort() int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return defaultPort
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port
+}
 func sortedKeys(m map[string]string) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

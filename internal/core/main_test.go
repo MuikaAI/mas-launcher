@@ -30,6 +30,15 @@ func TestEnvRoundTrip(t *testing.T) {
 		}
 	}
 }
+func TestRandomPort(t *testing.T) {
+	port := randomPort()
+	if port < 1 || port > 65535 {
+		t.Fatalf("port %d out of range", port)
+	}
+	if second := randomPort(); second == port {
+		t.Fatalf("randomPort returned %d twice", port)
+	}
+}
 func TestStateRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("MUIKA_HOME", root)
