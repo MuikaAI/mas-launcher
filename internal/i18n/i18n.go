@@ -50,6 +50,7 @@ var zhMessages = map[string]string{
 	"Installing dependencies with uv...":                               "正在用 uv 安装依赖...",
 	"uv not found; using system Python...":                             "未找到 uv，改用系统 Python...",
 	"Configuration saved. Add model settings with: mas-launcher model": "配置已保存。使用 mas-launcher model 添加模型设置",
+	"invalid Core WebSocket URL %q; expected ws://host:port/ws":        "无效的 Core WebSocket URL %q；应为 ws://host:port/ws",
 	"%s started (PID %d)\n":                                            "%s 已启动（PID %d）\n",
 	"Core":                                                             "Core",
 	"Bot":                                                              "Bot",

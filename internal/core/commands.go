@@ -7,9 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,7 +88,7 @@ func (m *Manager) ensureEnvironment(repo string) error {
 }
 func (m *Manager) defaultFiles(repo string, i Instance) error {
 	if _, e := os.Stat(filepath.Join(repo, ".env")); errors.Is(e, os.ErrNotExist) {
-		text := fmt.Sprintf("MASTER_ID=\nSUPERUSERS=[]\nMUIKA_CORE_WS_URL=ws://%s:%d/ws\nMUIKA_DATA_DIR=./data\nCORE_WS_URL=ws://%s:%d/ws\nONEBOT_WS_URLS=[\"ws://127.0.0.1:3001\"]\nDRIVER=~fastapi+~httpx+~websockets\nIPC_SECRET=%s\n", i.Host, i.Port, i.Host, i.Port, secret())
+		text := fmt.Sprintf("MASTER_ID=\nSUPERUSERS=[]\nCORE_WS_URL=ws://%s:%d/ws\nDATA_DIR=./data\nONEBOT_WS_URLS=[\"ws://127.0.0.1:3001\"]\nDRIVER=~fastapi+~httpx+~websockets\nIPC_SECRET=%s\n", i.Host, i.Port, secret())
 		if e = os.WriteFile(filepath.Join(repo, ".env"), []byte(text), 0o600); e != nil {
 			return e
 		}
@@ -119,6 +121,9 @@ func (m *Manager) configureCmd(args []string) error {
 		return e
 	}
 	values := parseEnv(filepath.Join(repo, ".env"))
+	// Drop legacy keys the current Core never reads, so edited values take effect.
+	delete(values, "MUIKA_CORE_WS_URL")
+	delete(values, "MUIKA_DATA_DIR")
 	in := bufio.NewReader(os.Stdin)
 	ask := func(label, current string) (string, error) {
 		fmt.Printf("%s [%s]: ", label, current)
@@ -148,7 +153,21 @@ func (m *Manager) configureCmd(args []string) error {
 	if values["CORE_WS_URL"], e = pick(i18n.T("Core WebSocket URL"), values["CORE_WS_URL"], *core); e != nil {
 		return e
 	}
+	if raw := values["CORE_WS_URL"]; raw != "" {
+		host, port, ce := parseCoreWSURL(raw)
+		if ce != nil {
+			return ce
+		}
+		if inst, ok := m.Config.Instances[name]; ok {
+			// Keep the Core listening address in step with the URL the Bot dials.
+			inst.Host, inst.Port = host, port
+			m.Config.Instances[name] = inst
+		}
+	}
 	if e = writeEnv(filepath.Join(repo, ".env"), values); e != nil {
+		return e
+	}
+	if e = m.save(); e != nil {
 		return e
 	}
 	if *provider != "" || *model != "" || *key != "" {
@@ -163,6 +182,24 @@ func (m *Manager) configureCmd(args []string) error {
 	}
 	fmt.Println(i18n.T("Configuration saved. Add model settings with: mas-launcher model"))
 	return nil
+}
+
+// parseCoreWSURL extracts the bind host and port from a Core WebSocket URL.
+func parseCoreWSURL(raw string) (string, int, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	invalid := fmt.Errorf(i18n.T("invalid Core WebSocket URL %q; expected ws://host:port/ws"), raw)
+	if err != nil {
+		return "", 0, invalid
+	}
+	host, portText := u.Hostname(), u.Port()
+	if u.Scheme != "ws" || host == "" || portText == "" {
+		return "", 0, invalid
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return "", 0, invalid
+	}
+	return host, port, nil
 }
 
 func (m *Manager) startCmd(args []string) error {
