@@ -19,7 +19,7 @@ mas-launcher model                    # 配置 models.yml（选 provider → 拉
 mas-launcher start                    # 首次启动会先展示许可协议，同意后拉起 Core 与 Bot
 ```
 
-`init` 创建实例时会优先使用 `git clone`（因此实例之后可以用 `update` 更新）；Python 环境优先用 uv，未安装时回退到系统 Python。
+`init` 创建实例时使用 `git clone`（需要 Git；实例之后可以用 `update` 更新）；Python 环境优先用 uv，未安装时回退到系统 Python。
 
 ## 命令
 

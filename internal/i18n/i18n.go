@@ -229,11 +229,9 @@ Refer to https://napneko.pages.dev or use Docker:
 	"NapCat.Shell.zip not found in latest release":                  "最新 Release 中未找到 NapCat.Shell.zip",
 
 	// repository.go
-	"cannot fetch repository; use a GitHub URL or install Git": "无法拉取仓库；请使用 GitHub 地址或安装 Git",
-	"failed to fetch release tags: %w":                         "获取发布标签失败：%w",
-	"repository download failed: %s":                           "仓库下载失败：%s",
-	"empty repository archive":                                 "仓库压缩包为空",
-	"archive contains an invalid path":                         "压缩包包含非法路径",
+	"cannot fetch repository; use a GitHub URL or install Git":    "无法拉取仓库；请使用 GitHub 地址或安装 Git",
+	"Git is required to fetch the project; install Git and retry": "需要 Git 来拉取项目；请安装 Git 后重试",
+	"failed to fetch release tags: %w":                            "获取发布标签失败：%w",
 
 	// models_fetch.go
 	"empty model list from %s": "%s 返回的模型列表为空",
