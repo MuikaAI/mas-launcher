@@ -344,7 +344,7 @@ func (m *Manager) updateCmd(args []string) error {
 	if _, e = exec.LookPath("git"); e != nil {
 		return errors.New(i18n.T("Git is required for update"))
 	}
-	for _, args := range [][]string{{"fetch", "--depth", "1", "origin", ref}, {"checkout", "-B", ref, "FETCH_HEAD"}} {
+	for _, args := range [][]string{{"fetch", "--depth", "1", "--tags", "origin", ref}, {"checkout", "-B", ref, "FETCH_HEAD"}} {
 		c := exec.Command("git", args...)
 		c.Dir, c.Stdout, c.Stderr = repo, os.Stdout, os.Stderr
 		if e = c.Run(); e != nil {

@@ -154,7 +154,6 @@ var zhMessages = map[string]string{
 	"Multimodal":                                                          "多模态",
 	"Online search":                                                       "联网搜索",
 	"Enable thinking":                                                     "启用思考",
-	"Thinking budget":                                                     "思考预算",
 	"Top K":                                                               "Top K",
 	`extra_body (JSON, e.g. {"thinking":{"type":"enabled"}})`: `extra_body（JSON，例如 {"thinking":{"type":"enabled"}}）`,
 	"Input price (USD/1M tokens)":                             "输入价格（美元/百万 tokens）",
@@ -175,7 +174,7 @@ var zhMessages = map[string]string{
 
 	// napcat.go
 	"NapCat Shell mode is not supported on this platform.":                             "此平台不支持 NapCat Shell 模式。",
-	"Docker deployment: see deploy/README.md":                                          "Docker 部署：参见 deploy/README.md",
+	"Docker deployment: see https://mas.snowy.moe/guide/bot-deployment":                "Docker 部署：参见 https://mas.snowy.moe/guide/bot-deployment",
 	"─ Onebot V11 (reverse WebSocket) ─":                                               "─ Onebot V11（反向 WebSocket）─",
 	"  Listen:   ws://%s:8080/onebot/v11/\n":                                           "  监听：ws://%s:8080/onebot/v11/\n",
 	"  The protocol implementation (e.g. NapCat) connects here as a WebSocket client.": "  协议实现（例如 NapCat）以 WebSocket 客户端身份连接到这里。",
@@ -198,17 +197,17 @@ var zhMessages = map[string]string{
   curl -o napcat.sh https://nclatest.znin.net/NapNeko/NapCat-Installer/main/script/install.sh && sudo bash napcat.sh
 
 Advanced options: --tui  --docker [y/n]  --cli [y/n]  --proxy [0-6]  --force
-Docker deployment: see deploy/README.md`: `运行 NapCat 安装脚本（需要 sudo）：
+Docker deployment: see https://mas.snowy.moe/guide/bot-deployment`: `运行 NapCat 安装脚本（需要 sudo）：
 
   curl -o napcat.sh https://nclatest.znin.net/NapNeko/NapCat-Installer/main/script/install.sh && sudo bash napcat.sh
 
 高级选项：--tui  --docker [y/n]  --cli [y/n]  --proxy [0-6]  --force
-Docker 部署：参见 deploy/README.md`,
+Docker 部署：参见 https://mas.snowy.moe/guide/bot-deployment`,
 	`NapCat Shell mode is not available on macOS.
 Refer to https://napneko.pages.dev or use Docker:
-  deploy/README.md`: `macOS 上不提供 NapCat Shell 模式。
+  https://mas.snowy.moe/guide/bot-deployment`: `macOS 上不提供 NapCat Shell 模式。
 参见 https://napneko.pages.dev 或使用 Docker：
-  deploy/README.md`,
+  https://mas.snowy.moe/guide/bot-deployment`,
 	"NapCat stopped (PID %d).\n":                                    "NapCat 已停止（PID %d）。\n",
 	"Downloading %s...\n":                                           "正在下载 %s...\n",
 	"Extracting...":                                                 "正在解压...",
@@ -228,6 +227,7 @@ Refer to https://napneko.pages.dev or use Docker:
 
 	// repository.go
 	"cannot fetch repository; use a GitHub URL or install Git": "无法拉取仓库；请使用 GitHub 地址或安装 Git",
+	"failed to fetch release tags: %w":                         "获取发布标签失败：%w",
 	"repository download failed: %s":                           "仓库下载失败：%s",
 	"empty repository archive":                                 "仓库压缩包为空",
 	"archive contains an invalid path":                         "压缩包包含非法路径",

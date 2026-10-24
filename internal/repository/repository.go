@@ -21,9 +21,17 @@ func FetchRepository(repo, ref, dest string) error {
 	// Prefer a git clone so instances stay updatable (mas-launcher update
 	// requires a checkout). Fall back to a GitHub zip only without git.
 	if _, err := exec.LookPath("git"); err == nil {
+		// Release tags are required for pdm-backend to derive the version that
+		// Self-Change compares across updates. A shallow clone only carries tags
+		// that point at the fetched tip, so fetch every tag afterwards.
 		c := exec.Command("git", "clone", "--depth", "1", "--branch", ref, repo, dest)
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		if err := c.Run(); err == nil {
+			tags := exec.Command("git", "-C", dest, "fetch", "--depth", "1", "--tags", "origin")
+			tags.Stdout, tags.Stderr = os.Stdout, os.Stderr
+			if err := tags.Run(); err != nil {
+				return fmt.Errorf(i18n.T("failed to fetch release tags: %w"), err)
+			}
 			return nil
 		}
 	}

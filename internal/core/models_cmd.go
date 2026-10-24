@@ -480,18 +480,6 @@ func (m *Manager) wizardParams(p *prompt, d *models.ModelDraft) error {
 	}
 	d.EnableThinking = &et
 
-	tb := 0
-	if d.ThinkingBudget != nil {
-		tb = *d.ThinkingBudget
-	}
-	tb, err = p.askInt(i18n.T("Thinking budget"), tb)
-	if err != nil {
-		return err
-	}
-	if tb != 0 || d.ThinkingBudget != nil {
-		d.ThinkingBudget = &tb
-	}
-
 	tk := 3.0
 	if d.TopK != nil {
 		tk = *d.TopK

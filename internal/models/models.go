@@ -165,7 +165,6 @@ type ModelDraft struct {
 	OnlineSearch bool
 
 	EnableThinking *bool
-	ThinkingBudget *int
 	TopK           *float64
 	Temperature    *float64
 	TopP           *float64
@@ -203,9 +202,6 @@ func (d ModelDraft) ToEntry() ModelEntry {
 	}
 	if d.EnableThinking != nil {
 		e["enable_thinking"] = *d.EnableThinking
-	}
-	if d.ThinkingBudget != nil {
-		e["thinking_budget"] = *d.ThinkingBudget
 	}
 	if d.TopK != nil {
 		e["top_k"] = *d.TopK
@@ -263,7 +259,6 @@ func (e ModelEntry) ToDraft() ModelDraft {
 		OnlineSearch: e.GetBool("online_search"),
 	}
 	d.EnableThinking = boolPtr(e, "enable_thinking")
-	d.ThinkingBudget = intPtr(e, "thinking_budget")
 	d.TopK = floatPtr(e, "top_k")
 	d.Temperature = floatPtr(e, "temperature")
 	d.TopP = floatPtr(e, "top_p")

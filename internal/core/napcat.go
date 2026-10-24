@@ -65,7 +65,7 @@ func (m *Manager) napcatCmd(args []string) error {
 		return napcatMacOS()
 	default:
 		fmt.Println(i18n.T("NapCat Shell mode is not supported on this platform."))
-		fmt.Println(i18n.T("Docker deployment: see deploy/README.md"))
+		fmt.Println(i18n.T("Docker deployment: see https://mas.snowy.moe/guide/bot-deployment"))
 		return nil
 	}
 }
@@ -275,7 +275,7 @@ func napcatLinux() error {
   curl -o napcat.sh https://nclatest.znin.net/NapNeko/NapCat-Installer/main/script/install.sh && sudo bash napcat.sh
 
 Advanced options: --tui  --docker [y/n]  --cli [y/n]  --proxy [0-6]  --force
-Docker deployment: see deploy/README.md`))
+Docker deployment: see https://mas.snowy.moe/guide/bot-deployment`))
 	return nil
 }
 
@@ -283,7 +283,7 @@ Docker deployment: see deploy/README.md`))
 func napcatMacOS() error {
 	fmt.Println(i18n.T(`NapCat Shell mode is not available on macOS.
 Refer to https://napneko.pages.dev or use Docker:
-  deploy/README.md`))
+  https://mas.snowy.moe/guide/bot-deployment`))
 	return nil
 }
 
